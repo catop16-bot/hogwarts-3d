@@ -1,0 +1,24 @@
+{
+  "name": "hogwarts-3d",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "霍格沃茲 3D 開放世界觀覽（非官方同人作品，全部以程式生成）",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "n8ao": "^2.0.1",
+    "postprocessing": "^6.39.6",
+    "simplex-noise": "^4.0.3",
+    "three": "^0.187.0",
+    "three-mesh-bvh": "^0.9.18"
+  },
+  "devDependencies": {
+    "@types/three": "^0.187.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.7"
+  }
+}

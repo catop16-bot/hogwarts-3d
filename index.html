@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>霍格沃茲 · 3D 觀覽</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- 字型以非阻塞方式載入：離線或連不上時直接改用系統字型 -->
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Noto+Serif+TC:wght@400;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
+  </head>
+  <body>
+    <canvas id="scene"></canvas>
+    <div id="ui"></div>
+    <div id="loading">
+      <div class="loading-inner">
+        <div class="loading-crest">H</div>
+        <div class="loading-title">霍格沃茲</div>
+        <div class="loading-sub">HOGWARTS · 3D 觀覽</div>
+        <div class="loading-bar"><div id="loading-fill"></div></div>
+        <div id="loading-text">正在準備…</div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
