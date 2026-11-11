@@ -6,6 +6,8 @@
 
 > 非官方的同人作品，與 Warner Bros.、J.K. Rowling 無關。
 
+**線上試玩：<https://catop16-bot.github.io/hogwarts-3d/>**（建議用桌機的 Chrome 或 Safari；推到 `main` 會自動重新部署）
+
 ## 執行
 
 需要 Node.js 20 以上。
