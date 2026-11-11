@@ -5,7 +5,10 @@ import { PL, heightAt } from '../world/heightfield';
 import { greatHallInterior, entranceInterior, staircaseInterior, GH } from './interiors';
 import { libraryInterior, hospitalInterior, clockInterior, corridorInterior, CORR } from './scenes/public';
 import { greenhouseInterior, astronomyDeck } from './scenes/classrooms';
-import { DOORS, towerDoor } from './scenes/doors';
+import { boathouseInterior, pottingShed } from './scenes/campus';
+import { DOORS, towerDoor, doorDecal } from './scenes/doors';
+import { TOWER_DOORS as TD } from './scenes/towers';
+import { WING_DOORS, SMALL_TOWER_DOORS, LOOKOUT_DOORS } from './scenes/wings';
 
 export interface Built {
   id: string;
@@ -232,6 +235,7 @@ export function buildCastle(): Built[] {
     b.bartizan(77 + 11.2, -4 + 4, Y + 50, 3.6, 22, 11, COOL);
     b.bartizan(77 - 6, -4 - 10.5, Y + 42, 3.2, 18, 10, COOL);
     b.wing({ x: 96, z: 20, y: Y, w: 44, d: 12, h: 20, roofH: 8, ry: -0.9, rows: 2, spacing: 6 });
+    towerDoor(b, TD.dada, 2.4, 3.6, 2.8, COOL);
     done('darkTower', b);
   }
 
@@ -256,8 +260,8 @@ export function buildCastle(): Built[] {
       b.bartizan(hx + Math.sin(a) * 10.4, hz + Math.cos(a) * 10.4, Y + 44 + i * 4, 3.9, 22 + i * 3, 12, WARM);
     });
     b.wing({ x: -74, z: 16, y: Y, w: 30, d: 14, h: 26, roofH: 10, rows: 3, spacing: 5.5, tint: WARM });
-    // 石像鬼守著入口
-    b.window(2.6, 4.6, hx + Math.sin(1.6) * 9.7, Y, hz + Math.cos(1.6) * 9.7, 1.6, 4, 0.1);
+    towerDoor(b, TD.gargoyle, 2.4, 3.6, 2.6, WARM);
+    doorDecal(b, TD.staffRoom, 2, 3.2, 0.04);
     done('headmaster', b);
   }
 
@@ -285,6 +289,8 @@ export function buildCastle(): Built[] {
     b.wing({ x: ax + 12, z: az + 22, y: Y, w: 26, d: 11, h: 44, roofH: 9, ry: -0.5, rows: 5, spacing: 5.5, tint: COOL });
     astronomyDeck(b);
     towerDoor(b, DOORS.astronomyBase, 2.4, 3.6, 3.2, COOL);
+    towerDoor(b, TD.astronomyNorth, 2.2, 3.4, 1.2, COOL);
+    towerDoor(b, TD.astronomyAnnex, 1.8, 3.0, 2.0, COOL);
     done('astronomy', b);
   }
 
@@ -297,6 +303,8 @@ export function buildCastle(): Built[] {
     b.roundTower({ x: -155, z: -55, y: Y, r: 5.2, h: 60, roofH: 16, rows: 6, per: 3 });
     b.wing({ x: -143, z: -68, y: Y, w: 36, d: 12, h: 24, roofH: 9, ry: 0.72, rows: 3, spacing: 5.5 });
     towerDoor(b, DOORS.ravenclaw);
+    towerDoor(b, TD.ravenclawAnnex, 1.8, 3.0, 2.0);
+    doorDecal(b, TD.ravenclawWing, 2, 3.2, 0.04);
     done('ravenclaw', b);
   }
 
@@ -307,6 +315,7 @@ export function buildCastle(): Built[] {
     b.bartizan(62 + 7.6, -128 - 3, Y + 70, 3.2, 20, 11, WARM);
     b.roundTower({ x: 73, z: -116, y: Y, r: 4.6, h: 68, roofH: 15, rows: 7, per: 2, tint: WARM });
     towerDoor(b, DOORS.divination, 2, 3.2, 2.4, WARM);
+    towerDoor(b, TD.divinationAnnex, 1.6, 2.8, 1.8, WARM);
     done('divination', b);
   }
 
@@ -319,6 +328,7 @@ export function buildCastle(): Built[] {
     b.bartizan(128 - 8, 96 - 8, Y + 70, 3.2, 20, 11, WARM);
     b.roundTower({ x: 111, z: 110, y: Y, r: 6.2, h: 70, roofH: 19, rows: 7, per: 3, tint: WARM });
     b.wing({ x: 96, z: 92, y: Y, w: 46, d: 15, h: 27, roofH: 10, ry: 0.12, rows: 3, spacing: 5.5, tint: WARM, dormers: 3 });
+    towerDoor(b, TD.gryffindor, 2.2, 3.4, 2.6, WARM);
     done('gryffindor', b);
   }
 
@@ -329,6 +339,8 @@ export function buildCastle(): Built[] {
     hospitalInterior(b);
     b.roundTower({ x: 152, z: 66, y: Y, r: 7, h: 54, roofH: 18, rows: 5, per: 3 });
     b.wing({ x: 108, z: 42, y: Y, w: 70, d: 11, h: 19, roofH: 7, rows: 2, spacing: 6 });
+    towerDoor(b, TD.hospitalTower, 1.8, 3.0, 2.0);
+    doorDecal(b, TD.hospitalWing, 2, 3.2, 0.04);
     done('hospital', b);
   }
 
@@ -344,6 +356,7 @@ export function buildCastle(): Built[] {
       b.window(12, 12, cx + Math.sin(a) * 9.5, Y + 48, cz + Math.cos(a) * 9.5, a, 2, 0.25);
     }
     b.wing({ x: cx, z: cz + 28, y: Y, w: 36, d: 13, h: 22, roofH: 9, ry: Math.PI / 2, rows: 3, spacing: 5.5, tint: WARM });
+    doorDecal(b, TD.mugglesWing, 2, 3.2, 0.04);
     done('clockTower', b);
   }
   {
@@ -449,24 +462,19 @@ export function buildCastle(): Built[] {
   // ================================================================ 溫室
   {
     const b = new Builder(28);
-    const GT = col(0.9, 1.0, 0.95);
     for (let i = 0; i < 3; i++) {
       const gz = -170 - i * 15;
       const gx = 92 + (i === 1 ? 4 : 0);
       b.box('stone', 36, 1.1, 10.4, gx, Y - 0.2, gz, 0, PAVE);
-      if (i === 0) greenhouseInterior(b, gx, gz);
-      else {
-        b.box('glass', 35, 3.6, 9.4, gx, Y + 0.9, gz, 0, GT);
-        b.gable('glass', 'glass', 35, 9.4, 3.4, gx, Y + 4.5, gz, 0, 0.15, GT, GT);
-        b.window(2, 3, gx - 17.5, Y + 0.9, gz, -Math.PI / 2, 4, 0.08);
-      }
+      greenhouseInterior(b, gx, gz, i);
       b.box('matte', 35.6, 0.25, 0.25, gx, Y + 7.8, gz, 0, col(0.7, 0.72, 0.7));
       // 花圃
       for (let k = 0; k < 6; k++) b.box('matte', 4, 0.5, 1.6, gx - 14 + k * 5.6, Y, gz + 7.2, 0, col(0.1, 0.16, 0.06));
     }
-    b.box('stone', 12, 6, 9, 62, Y, -186, 0, WARM);
-    b.gable('roof', 'stone', 12, 9, 4.5, 62, Y + 6, -186, 0, 0.5, undefined, WARM);
-    b.window(1.2, 2.2, 62, Y + 1.8, -181.5, 0, 0);
+    // 盆栽棚（挖空，可以走進去）
+    pottingShed(b, 56, 68, -190.5, -181.5, Y + 0.15, WARM);
+    b.gable('roof', 'stone', 12, 9, 4.5, 62, Y + 6.15, -186, 0, 0.5, undefined, WARM);
+    b.window(1.2, 2.2, 62, Y + 1.75, -181.1, 0, 0);
     done('greenhouses', b);
     // 玻璃不擋陽光，溫室裡才會亮
     out[out.length - 1].group.traverse((o) => o.name.endsWith(':glass') && (o.castShadow = false));
@@ -478,7 +486,15 @@ export function buildCastle(): Built[] {
     const bx = -190;
     const bz = 158;
     b.box('stone', 26, 6, 15, bx, -4.4, bz, 0.5, DARK);
-    b.wing({ x: bx, z: bz, y: 1.6, w: 19, d: 10.5, h: 7.5, ry: 0.5, roofH: 8, rows: 1, spacing: 4.4, winW: 1.5, winH: 3.6, winY: 1.4, tint: WARM, found: 2, gableWin: [2.4, 4.6, 4] });
+    {
+      // 臨湖那一面的大開口不放窗
+      const c = Math.cos(0.5);
+      const sn = Math.sin(0.5);
+      const ox = bx + 5.25 * sn;
+      const oz = bz + 5.25 * c;
+      b.wing({ x: bx, z: bz, y: 1.6, w: 19, d: 10.5, h: 7.5, ry: 0.5, roofH: 8, rows: 1, spacing: 4.4, winW: 1.5, winH: 3.6, winY: 1.4, tint: WARM, found: 2, gableWin: null, noBody: true, skipWin: (wx, wz) => Math.hypot(wx - ox, wz - oz) < 2 });
+      boathouseInterior(b, { x: bx, z: bz, y: 1.6, w: 19, d: 10.5, ry: 0.5 }, 7.5, 2, WARM);
+    }
     for (const [lx, lz] of [[-9, 6.5], [0, 6.5], [9, 6.5], [-11, -3], [11, -3]]) {
       const c = Math.cos(0.5);
       const s = Math.sin(0.5);
@@ -549,6 +565,14 @@ export function buildCastle(): Built[] {
     b.squareTower({ x: 60, z: -152, y: Y, w: 14, d: 10, h: 20, roof: 'gable', roofH: 6, turrets: 1.4, turretH: 5, rows: 1, cols: 1 });
     b.window(5, 7.5, 60, Y, -157, Math.PI, 4, 0.2);
     b.window(5, 7.5, 60, Y, -147, 0, 4, 0.2);
+    // 第 7 批：廂房的門與小塔的門廊
+    for (const d of Object.values(WING_DOORS)) doorDecal(b, d, 2, 3.2, 0.04);
+    for (const [k, d] of Object.entries(SMALL_TOWER_DOORS)) {
+      if (k === 'hallAttic') towerDoor(b, d, 1.4, 2.6, 0.8, WARM);
+      else if (k === 'gate') doorDecal(b, d, 1.6, 2.8, 0.04);
+      else towerDoor(b, d, 1.8, 3.0, 2.0);
+    }
+    for (const d of LOOKOUT_DOORS) towerDoor(b, d, 1.6, 2.8, 1.8);
     done('castleMisc', b);
   }
 

@@ -183,6 +183,22 @@ export function greatHallInterior(b: Builder) {
     for (let i = 0; i < 27; i++) {
       const x = cx - len / 2 + 1 + i * 1.35;
       for (const s of [-1, 1]) b.cyl('iplain', 0.15, 0.13, 0.025, x, F + 0.84, z + s * 0.3, 8, GOLD);
+      // 每個座位一只高腳金杯
+      for (const s of [-1, 1]) {
+        b.cyl('iplain', 0.05, 0.03, 0.03, x + 0.28, F + 0.84, z + s * 0.36, 6, GOLD);
+        b.cyl('iplain', 0.012, 0.012, 0.08, x + 0.28, F + 0.87, z + s * 0.36, 4, GOLD);
+        b.cyl('iplain', 0.045, 0.03, 0.08, x + 0.28, F + 0.95, z + s * 0.36, 7, GOLD);
+      }
+      // 桌子中線上的大盤菜餚、水壺與水果
+      if (i % 3 === 0) {
+        b.cyl('iplain', 0.26, 0.2, 0.04, x, F + 0.84, z, 10, GOLD);
+        const FOOD = [col(0.62, 0.35, 0.12), col(0.75, 0.55, 0.25), col(0.5, 0.12, 0.08), col(0.3, 0.45, 0.12)];
+        for (let k = 0; k < 4; k++) b.sphere('iplain', 0.07 + (k % 2) * 0.03, x + Math.cos(k * 1.6 + i) * 0.1, F + 0.92, z + Math.sin(k * 1.6 + i) * 0.1, FOOD[(k + i) % 4], 0.75, 6);
+      } else if (i % 3 === 2) {
+        b.cyl('iplain', 0.06, 0.09, 0.26, x - 0.2, F + 0.84, z, 8, GOLD);
+        b.cyl('iplain', 0.18, 0.12, 0.06, x + 0.25, F + 0.84, z, 10, GOLD);
+        for (let k = 0; k < 3; k++) b.sphere('iplain', 0.05, x + 0.25 + Math.cos(k * 2.1) * 0.07, F + 0.93, z + Math.sin(k * 2.1) * 0.07, [col(0.75, 0.1, 0.1), col(0.9, 0.6, 0.1), col(0.4, 0.6, 0.1)][k], 1, 6);
+      }
       if (i % 3 === 1) {
         b.cyl('iplain', 0.05, 0.07, 0.3, x + 0.6, F + 0.84, z, 6, GOLD);
         b.sphere('iglow', 0.045, x + 0.6, F + 1.2, z, FIRE, 1.7, 5);

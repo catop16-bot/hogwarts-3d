@@ -20,6 +20,8 @@ export interface AnimState {
   grounded: boolean;
   mode: MoveMode;
   bank: number; // 飛行時的側傾
+  /** 轉身的角速度（弧度／秒），用來讓身體往彎道內側傾 */
+  turn?: number;
 }
 
 const sat = (x: number) => Math.min(1, Math.max(0, x));
@@ -46,11 +48,19 @@ export class Character {
   private phase = 0;
   private t = 0;
   private k = 1;
+  private wasGrounded = true;
+  private land = 0;
+  private lean = 0;
+  private look = 0;
+  private lookT = 0;
 
   constructor() {
-    const robe = new THREE.MeshStandardMaterial({ color: 0x30303a, roughness: 0.8, side: THREE.DoubleSide });
+    const robe = new THREE.MeshStandardMaterial({ color: 0x3b3c48, roughness: 0.72, side: THREE.DoubleSide });
     const grey = new THREE.MeshStandardMaterial({ color: 0x4a4c52, roughness: 0.9 });
-    const dark = new THREE.MeshStandardMaterial({ color: 0x25252b, roughness: 0.85 });
+    const dark = new THREE.MeshStandardMaterial({ color: 0x33343a, roughness: 0.85 });
+    const shoe = new THREE.MeshStandardMaterial({ color: 0x141414, roughness: 0.35 });
+    const white = new THREE.MeshStandardMaterial({ color: 0xf0eee8, roughness: 0.4 });
+    const lip = new THREE.MeshStandardMaterial({ color: 0xa8625a, roughness: 0.7 });
     const skin = new THREE.MeshStandardMaterial({ color: 0xd9a583, roughness: 0.75 });
     const hair = new THREE.MeshStandardMaterial({ color: 0x4a2f1a, roughness: 0.75 });
     const shirt = new THREE.MeshStandardMaterial({ color: 0xd8d6cf, roughness: 0.8 });
@@ -79,7 +89,7 @@ export class Character {
       add(th, new THREE.CylinderGeometry(0.078, 0.064, 0.44, 8), dark, 0, -0.21, 0);
       const sh = pivot(th, 0, -0.43, 0);
       add(sh, new THREE.CylinderGeometry(0.06, 0.05, 0.42, 8), dark, 0, -0.2, 0);
-      add(sh, new THREE.BoxGeometry(0.095, 0.075, 0.25), dark, 0, -0.43, 0.05);
+      add(sh, new THREE.BoxGeometry(0.1, 0.08, 0.27), shoe, 0, -0.43, 0.055);
       this.thigh.push(th);
       this.shin.push(sh);
     }
@@ -109,9 +119,16 @@ export class Character {
     const sh = add(this.torso, new THREE.SphereGeometry(0.2, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), robe, 0, 0.555, 0);
     sh.scale.set(1.12, 0.38, 0.72);
     // 兜帽
-    const hood = add(this.torso, new THREE.SphereGeometry(0.13, 10, 8), robe, 0, 0.56, -0.13);
-    hood.scale.set(1.15, 0.85, 0.6);
-    add(this.torso, new THREE.SphereGeometry(0.1, 8, 6), this.primary, 0, 0.585, -0.1).scale.set(1.1, 0.5, 0.5);
+    // 兜帽垂在背後，內襯是學院色
+    const hood = add(this.torso, new THREE.SphereGeometry(0.15, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.62), robe, 0, 0.5, -0.15);
+    hood.scale.set(1.2, 1.15, 0.62);
+    hood.rotation.x = -2.5;
+    const lining = add(this.torso, new THREE.SphereGeometry(0.135, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.5), this.primary, 0, 0.515, -0.145);
+    lining.scale.set(1.12, 1.05, 0.5);
+    lining.rotation.x = -2.5;
+    // 胸前的學院徽章
+    add(this.torso, new THREE.BoxGeometry(0.075, 0.085, 0.012), this.primary, -0.12, 0.42, 0.13).rotation.y = -0.25;
+    add(this.torso, new THREE.BoxGeometry(0.045, 0.05, 0.014), this.secondary, -0.12, 0.42, 0.135).rotation.y = -0.25;
 
     // 手臂
     for (const s of [-1, 1]) {
@@ -142,13 +159,23 @@ export class Character {
     add(this.head, new THREE.CylinderGeometry(0.05, 0.055, 0.1, 8), skin, 0, 0.03, 0);
     const skull = add(this.head, new THREE.SphereGeometry(0.118, 16, 12), skin, 0, 0.185, 0);
     skull.scale.set(0.95, 1.1, 1);
-    const cap = add(this.head, new THREE.SphereGeometry(0.127, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.52), hair, 0, 0.195, -0.008);
+    const cap = add(this.head, new THREE.SphereGeometry(0.127, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.5), hair, 0, 0.215, -0.012);
     cap.scale.set(0.97, 1.08, 1.02);
     const back = add(this.head, new THREE.SphereGeometry(0.115, 12, 8), hair, 0, 0.17, -0.035);
     back.scale.set(0.98, 1.05, 0.9);
-    cap.rotation.x = 0.28;
-    for (const s of [-1, 1]) add(this.head, new THREE.SphereGeometry(0.014, 6, 5), dark, s * 0.042, 0.195, 0.106);
+    cap.rotation.x = -0.12;
+    for (const s of [-1, 1]) {
+      // 眼白、瞳孔、眉毛與耳朵
+      add(this.head, new THREE.SphereGeometry(0.019, 8, 6), white, s * 0.042, 0.195, 0.1).scale.set(1.2, 0.8, 0.6);
+      add(this.head, new THREE.SphereGeometry(0.011, 6, 5), dark, s * 0.042, 0.195, 0.111);
+      const brow = add(this.head, new THREE.BoxGeometry(0.04, 0.009, 0.01), hair, s * 0.043, 0.222, 0.108);
+      brow.rotation.z = s * -0.12;
+      add(this.head, new THREE.SphereGeometry(0.026, 8, 6), skin, s * 0.112, 0.18, -0.005).scale.set(0.5, 1, 0.8);
+      // 鬢角的頭髮
+      add(this.head, new THREE.BoxGeometry(0.03, 0.08, 0.06), hair, s * 0.105, 0.215, 0.02);
+    }
     add(this.head, new THREE.SphereGeometry(0.016, 6, 5), skin, 0, 0.165, 0.118);
+    add(this.head, new THREE.BoxGeometry(0.038, 0.009, 0.01), lip, 0, 0.128, 0.108);
 
     // 學院圍巾
     const wrap = add(this.torso, new THREE.TorusGeometry(0.082, 0.036, 8, 16), this.primary, 0, 0.6, 0.005);
@@ -156,6 +183,13 @@ export class Character {
     this.tail.position.set(0.075, 0.585, 0.12);
     this.torso.add(this.tail);
     for (let i = 0; i < 7; i++) add(this.tail, new THREE.BoxGeometry(0.085, 0.066, 0.022), i % 2 ? this.secondary : this.primary, 0, -0.035 - i * 0.065, 0);
+    // 另一端甩到背後：從後面看也認得出是哪個學院
+    const back2 = new THREE.Group();
+    back2.position.set(-0.08, 0.6, -0.2);
+    back2.rotation.set(-0.12, 0, -0.08);
+    this.torso.add(back2);
+    for (let i = 0; i < 8; i++) add(back2, new THREE.BoxGeometry(0.09, 0.066, 0.022), i % 2 ? this.secondary : this.primary, 0, -0.035 - i * 0.065, 0);
+    add(back2, new THREE.BoxGeometry(0.09, 0.03, 0.02), this.secondary, 0, -0.56, 0);
 
     // 飛天掃帚
     const stick = add(this.broom, new THREE.CylinderGeometry(0.017, 0.02, 1.7, 8), wood);
@@ -251,6 +285,10 @@ export class Character {
       this.to(this.skirt, s.vy < 0 ? -0.15 : 0.2);
       this.to(this.tail, s.vy < 0 ? -0.6 : 0.4);
     } else {
+      // 落地時膝蓋一彎、身體一沉
+      if (!this.wasGrounded) this.land = Math.min(1, this.land + 0.6);
+      this.land = Math.max(0, this.land - dt * 3.2);
+      const land = this.land * this.land;
       const run = sat((s.speed - 3) / 4.5);
       const amp = sat(s.speed / 2);
       if (amp > 0.02) this.phase += dt * (3.4 + s.speed * 1.15);
@@ -259,12 +297,20 @@ export class Character {
       const A = mix(0.5, 0.95, run) * amp;
       const K = mix(0.75, 1.55, run) * amp;
       const breath = Math.sin(t * 1.5) * 0.02 * (1 - amp);
-      this.to(this.torso, mix(0.02, 0.2, run) * amp + breath * 0.4, sw * 0.14 * amp, 0);
-      this.to(this.head, -mix(0, 0.12, run) * amp, -sw * 0.08 * amp, 0);
-      this.to(tL, -sw * A);
-      this.to(tR, sw * A);
-      this.to(sL, Math.max(0, cw) * K + 0.05 * amp);
-      this.to(sR, Math.max(0, -cw) * K + 0.05 * amp);
+      // 轉彎時往內側傾；站著不動時偶爾轉頭看看四周、重心左右換腳
+      this.lean += (Math.max(-1, Math.min(1, (s.turn ?? 0) * 0.12)) * amp - this.lean) * Math.min(1, dt * 6);
+      this.lookT -= dt;
+      if (this.lookT <= 0) {
+        this.look = amp > 0.1 ? 0 : (Math.random() - 0.5) * 1.1;
+        this.lookT = 2 + Math.random() * 3;
+      }
+      const sway = Math.sin(t * 0.7) * (1 - amp);
+      this.to(this.torso, mix(0.02, 0.2, run) * amp + breath * 0.4 + land * 0.35, sw * 0.14 * amp, -this.lean * 0.5 + sway * 0.025);
+      this.to(this.head, -mix(0, 0.12, run) * amp - land * 0.2, -sw * 0.08 * amp + this.look * (1 - amp), this.lean * 0.3);
+      this.to(tL, -sw * A - land * 0.55 + sway * 0.04);
+      this.to(tR, sw * A - land * 0.55 - sway * 0.04);
+      this.to(sL, Math.max(0, cw) * K + 0.05 * amp + land * 1.0);
+      this.to(sR, Math.max(0, -cw) * K + 0.05 * amp + land * 1.0);
       const AA = mix(0.4, 1.0, run) * amp;
       this.to(aL, sw * AA + breath, 0, -0.07);
       this.to(fL, -(0.12 + run * 1.1 * amp) - Math.max(0, sw) * 0.3 * amp);
@@ -278,8 +324,10 @@ export class Character {
       }
       this.to(this.skirt, amp * 0.08 + run * 0.2);
       this.to(this.tail, amp * 0.15 + run * 0.5 + sw * 0.08 * amp, 0, cw * 0.1 * amp);
-      bodyY = -Math.abs(cw) * mix(0.02, 0.05, run) * amp;
+      bodyY = -Math.abs(cw) * mix(0.02, 0.05, run) * amp - land * 0.16 + sway * 0.004;
+      rootZ = -this.lean * 0.22;
     }
+    this.wasGrounded = s.grounded || s.mode !== 'walk';
     this.body.position.y += (bodyY - this.body.position.y) * k;
     this.root.rotation.x += (rootX - this.root.rotation.x) * k * 0.6;
     this.root.rotation.z += (rootZ - this.root.rotation.z) * k * 0.6;

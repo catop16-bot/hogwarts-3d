@@ -322,3 +322,114 @@ export function pouf(p: At, tint: THREE.Color) {
   p.cyl('iplain', 0.3, 0.33, 0.36, 0, 0, 0, 10, tint);
   p.sphere('iplain', 0.3, 0, 0.36, 0, tint, 0.35);
 }
+
+export interface RingGap {
+  /** 方位角（0 朝 +Z） */
+  a: number;
+  /** 開口寬度（公尺） */
+  w: number;
+  /** 開口的上下緣（世界高度） */
+  y0: number;
+  y1: number;
+}
+/**
+ * 由一圈方塊砌成的中空圓牆（可以開門洞），碰撞與外觀都跟實心圓塔一樣，只是裡面是空的。
+ * lining 表示內側再貼一層室內石材。skip(a) 為 true 的那一段不砌（兩間圓屋相連時用）。
+ */
+export function ringWall(
+  b: Builder,
+  x: number,
+  y: number,
+  z: number,
+  rIn: number,
+  rOut: number,
+  h: number,
+  o: { seg?: number; tint?: THREE.Color; gaps?: RingGap[]; skip?: (a: number) => boolean; lining?: THREE.Color; key?: MatKey } = {},
+) {
+  const seg = o.seg ?? Math.max(12, Math.round(rOut * 4.2));
+  const step = (Math.PI * 2) / seg;
+  const width = 2 * rOut * Math.tan(step / 2) + 0.04;
+  const LIN = o.lining ? 0.15 : 0;
+  const depth = rOut - rIn - LIN;
+  for (let i = 0; i < seg; i++) {
+    const a = i * step;
+    if (o.skip?.(a)) continue;
+    const p = new At(b, x + Math.sin(a) * ((rIn + LIN + rOut) / 2), y, z + Math.cos(a) * ((rIn + LIN + rOut) / 2), a);
+    const q = new At(b, x + Math.sin(a) * (rIn + LIN / 2), y, z + Math.cos(a) * (rIn + LIN / 2), a);
+    const piece = (y0: number, y1: number) => {
+      if (y1 - y0 < 0.01) return;
+      p.box(o.key ?? 'stone', width, y1 - y0, depth, 0, y0 - y, 0, o.tint);
+      if (o.lining) q.box('istone', 2 * rIn * Math.tan(step / 2) + 0.04, y1 - y0, LIN, 0, y0 - y, 0, o.lining);
+    };
+    const gap = o.gaps?.find((g) => Math.abs(Math.atan2(Math.sin(a - g.a), Math.cos(a - g.a))) < g.w / 2 / rOut);
+    if (gap) {
+      piece(y, Math.max(y, gap.y0));
+      piece(Math.min(y + h, gap.y1), y + h);
+    } else piece(y, y + h);
+  }
+}
+
+export interface LocalOpening {
+  /** 廂房自己的方向：S=+Z、N=-Z、E=+X、W=-X */
+  side: 'N' | 'S' | 'E' | 'W';
+  at: number;
+  w: number;
+  h: number;
+}
+/**
+ * 會旋轉的房間（room() 只能沿座標軸）：w、d 是外牆的外緣尺寸，t 是牆厚。
+ * 外層是城堡石材、內層是室內石材，開口是真的洞。
+ */
+export function orientedRoom(
+  b: Builder,
+  cx: number,
+  y: number,
+  cz: number,
+  ry: number,
+  w: number,
+  d: number,
+  h: number,
+  o: { t?: number; openings?: LocalOpening[]; tint?: THREE.Color; itint?: THREE.Color; key?: MatKey; found?: number; ceil?: number; floorTint?: THREE.Color } = {},
+) {
+  const t = o.t ?? 0.4;
+  const LIN = 0.15;
+  const p = new At(b, cx, y, cz, ry);
+  const itint = o.itint ?? IWARM;
+  const key = o.key ?? 'stone';
+  for (const side of ['N', 'S', 'E', 'W'] as const) {
+    const alongX = side === 'N' || side === 'S';
+    const len = alongX ? w : d - 2 * t;
+    const sgn = side === 'S' || side === 'E' ? 1 : -1;
+    const off = ((alongX ? d : w) / 2) * sgn;
+    const ops = (o.openings || []).filter((q) => q.side === side).sort((a, c) => a.at - c.at);
+    const piece = (c0: number, c1: number, y0: number, y1: number) => {
+      const l = c1 - c0;
+      if (l < 0.01 || y1 - y0 < 0.01) return;
+      const m = (c0 + c1) / 2;
+      const outer = off - sgn * ((t - LIN) / 2);
+      const inner = off - sgn * (t - LIN / 2);
+      // 內側那層要退到牆角內，避免從屋外看得到
+      const il = alongX ? Math.min(c1, w / 2 - t) - Math.max(c0, -w / 2 + t) : l;
+      const im = alongX ? (Math.min(c1, w / 2 - t) + Math.max(c0, -w / 2 + t)) / 2 : m;
+      if (alongX) {
+        p.box(key, l, y1 - y0, t - LIN, m, y0, outer, o.tint);
+        if (il > 0.01) p.box('istone', il, y1 - y0, LIN, im, y0, inner, itint);
+      } else {
+        p.box(key, t - LIN, y1 - y0, l, outer, y0, m, o.tint);
+        p.box('istone', LIN, y1 - y0, l, inner, y0, m, itint);
+      }
+    };
+    let cur = -len / 2;
+    for (const q of ops) {
+      piece(cur, q.at - q.w / 2, -(o.found ?? 0.5), h);
+      piece(q.at - q.w / 2, q.at + q.w / 2, q.h, h);
+      // 門檻：開口下方填實，免得門口變成一道往下的縫
+      piece(q.at - q.w / 2, q.at + q.w / 2, -(o.found ?? 0.5), 0);
+      cur = q.at + q.w / 2;
+    }
+    piece(cur, len / 2, -(o.found ?? 0.5), h);
+  }
+  p.box('istone', w - 2 * t + 0.02, 0.5, d - 2 * t + 0.02, 0, -0.5, 0, o.floorTint ?? itint);
+  if (o.ceil != null) p.box('iwood', w - 2 * t, 0.25, d - 2 * t, 0, o.ceil, 0, DARKWOOD);
+  return p;
+}

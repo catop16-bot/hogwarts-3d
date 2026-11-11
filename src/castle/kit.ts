@@ -41,6 +41,8 @@ export interface TowerOpts {
   found?: number;
   winFrom?: number; // 從多高開始有窗（比例）
   noFinial?: boolean;
+  /** 不建實心塔身、基座與腰線（由室內模組另外砌出中空的圓牆） */
+  noBody?: boolean;
 }
 export interface SquareOpts {
   x: number;
@@ -313,12 +315,14 @@ export class Builder {
     const top = o.top ?? 'corbel';
     const rTop = o.r * (1 - taper);
     const tint = o.tint;
-    this.cyl('stone', rTop, o.r * 1.02, o.h + found, o.x, y0 - found, o.z, seg, tint);
-    // 基座與腰線
-    this.cyl('stone', o.r * 1.06, o.r * 1.1, 3, o.x, y0 - 0.5, o.z, seg, tint);
-    for (const f of [0.34, 0.66]) {
-      const rr = o.r * (1 - taper * f) + 0.22;
-      this.cyl('stone', rr, rr, 0.55, o.x, y0 + o.h * f, o.z, seg, tint);
+    if (!o.noBody) {
+      this.cyl('stone', rTop, o.r * 1.02, o.h + found, o.x, y0 - found, o.z, seg, tint);
+      // 基座與腰線
+      this.cyl('stone', o.r * 1.06, o.r * 1.1, 3, o.x, y0 - 0.5, o.z, seg, tint);
+      for (const f of [0.34, 0.66]) {
+        const rr = o.r * (1 - taper * f) + 0.22;
+        this.cyl('stone', rr, rr, 0.55, o.x, y0 + o.h * f, o.z, seg, tint);
+      }
     }
     let roofR = rTop;
     let roofY = y0 + o.h;

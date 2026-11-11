@@ -4,7 +4,8 @@ import { getMaterials } from './materials';
 import { heightAt, getPaths, getPath, STAMPS, WATER, type BuiltPath } from '../world/heightfield';
 import { patchMaterial, makeRng } from '../core/globals';
 import type { Built } from './castle';
-import { honeydukesDoor, towerDoor } from './scenes/doors';
+import { honeydukesDoor, towerDoor, doorDecal, WILLOW_DOOR, SHACK_DOOR, PITCH_DOORS } from './scenes/doors';
+import { hagridHut, owleryInterior, stationInterior } from './scenes/campus';
 
 const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 const IRON = col(0.04, 0.04, 0.045);
@@ -129,7 +130,8 @@ export function buildGrounds(): { built: Built[]; extras: THREE.Object3D[]; hand
   const owY = heightAt(ow.x, ow.z);
   {
     const b = new Builder(41);
-    b.roundTower({ x: ow.x, z: ow.z, y: owY, r: 6.4, h: 27, roofH: 14, rows: 0, per: 0, top: 'corbel', found: 12, tint: col(0.92, 0.9, 0.88) });
+    b.roundTower({ x: ow.x, z: ow.z, y: owY, r: 6.4, h: 27, roofH: 14, rows: 0, per: 0, top: 'corbel', found: 12, tint: col(0.92, 0.9, 0.88), taper: 0, noBody: true });
+    owleryInterior(b, ow.x, owY, ow.z, 6.4, 27, col(0.92, 0.9, 0.88));
     // 給貓頭鷹進出的成排拱窗（沒有玻璃）
     for (let row = 0; row < 5; row++) {
       const n = 9;
@@ -145,7 +147,6 @@ export function buildGrounds(): { built: Built[]; extras: THREE.Object3D[]; hand
       const sz = THREE.MathUtils.lerp(-362, ow.z + 5.2, t);
       b.box('stone', 2.6, 1.4, 1.5, sx, heightAt(sx, sz) - 0.9, sz, 0.6);
     }
-    b.window(1.8, 3.2, ow.x + Math.sin(0.78) * 6.4, owY, ow.z + Math.cos(0.78) * 6.4, 0.78, 4, 0.1);
     done('owlery', b);
   }
 
@@ -156,21 +157,14 @@ export function buildGrounds(): { built: Built[]; extras: THREE.Object3D[]; hand
   {
     const b = new Builder(42);
     const HS = col(0.95, 0.9, 0.82);
-    // 兩間相連的圓形石屋
-    b.cyl('stone', 6.6, 6.9, 6 + 3, hg.x, hgY - 3, hg.z, 10, HS);
-    b.cone('roof', 7.9, 8.5, hg.x, hgY + 5.6, hg.z, 10, THATCH);
-    b.cyl('stone', 4.6, 4.8, 5 + 3, hg.x + 8.2, hgY - 3, hg.z + 3.5, 10, HS);
-    b.cone('roof', 5.7, 6.5, hg.x + 8.2, hgY + 4.7, hg.z + 3.5, 10, THATCH);
+    // 兩間相連的圓形石屋（挖空，可以走進去）
+    hagridHut(b, hg.x, hgY, hg.z, HS, THATCH, LAMP);
     b.box('stone', 2.0, 15, 2.0, hg.x - 4.2, hgY - 1, hg.z - 3.6, 0.3, HS);
     b.box('stone', 2.4, 0.5, 2.4, hg.x - 4.2, hgY + 14, hg.z - 3.6, 0.3, HS);
-    b.window(2.4, 3.6, hg.x + Math.sin(2.6) * 6.7, hgY, hg.z + Math.cos(2.6) * 6.7, 2.6, 4, 0.1);
-    for (const a of [0.4, 1.5, 3.9, 5.2]) b.window(1.2, 1.5, hg.x + Math.sin(a) * 6.75, hgY + 2.1, hg.z + Math.cos(a) * 6.75, a, 0, 0.08);
-    for (const a of [0.2, 1.9]) b.window(1.0, 1.3, hg.x + 8.2 + Math.sin(a) * 4.75, hgY + 1.9, hg.z + 3.5 + Math.cos(a) * 4.75, a, 0, 0.08);
-    b.sphere('lamp', 0.25, hg.x + Math.sin(2.95) * 7.0, hgY + 3.2, hg.z + Math.cos(2.95) * 7.0, LAMP);
     // 門前的石階與木桶
     b.box('stone', 3.4, 0.4, 2.2, hg.x + Math.sin(2.6) * 8, hgY - 0.1, hg.z + Math.cos(2.6) * 8, 2.6, HS);
-    b.cyl('wood', 0.6, 0.55, 1.2, hg.x + 3.5, hgY, hg.z - 7.2, 8);
-    b.cyl('wood', 0.6, 0.55, 1.2, hg.x + 4.9, hgY, hg.z - 7.0, 8);
+    b.cyl('wood', 0.6, 0.55, 1.2, hg.x + 7.0, hgY, hg.z - 2.4, 8);
+    b.cyl('wood', 0.6, 0.55, 1.2, hg.x + 7.3, hgY, hg.z - 3.9, 8);
     // 南瓜田的木柵欄
     const px = hg.x - 22;
     const pz = hg.z + 6;
@@ -267,6 +261,7 @@ export function buildGrounds(): { built: Built[]; extras: THREE.Object3D[]; hand
     }
     // 環繞球場的看台高塔
     const towers = 16;
+    const towerSpots: { x: number; z: number; gy: number; face: number }[] = [];
     for (let i = 0; i < towers; i++) {
       const a = (i / towers) * Math.PI * 2 + 0.2;
       const x = pt.x + Math.cos(a) * 96;
@@ -289,7 +284,7 @@ export function buildGrounds(): { built: Built[]; extras: THREE.Object3D[]; hand
       roofG.scale(9.4, 5.5, 9.4);
       b.add('cloth', roofG, mat4(x, gy + h + 4.2 + 2.75, z, face), c);
       b.cyl('matte', 0.05, 0.08, 4, x, gy + h + 9.6, z, 5, IRON);
-      b.add('cloth', new THREE.PlaneGeometry(2.6, 1.5), mat4(x + 1.3, gy + h + 12.6, z, 0), c);
+      b.add('cloth', new THREE.PlaneGeometry(2.6, 1.5), mat4(x + 1.3, gy + h + 12.6, z, 0), c);      towerSpots.push({ x, z, gy, face });
     }
     // 塔與塔之間的低看台；最靠近小徑終點的那一段留作球場入口
     const trail = getPath('pitch');
@@ -304,6 +299,15 @@ export function buildGrounds(): { built: Built[]; extras: THREE.Object3D[]; hand
           gate.d = d;
           gate.i = i;
         }
+      }
+    }
+    // 入口兩旁的看台塔，塔底朝球場的那一面是更衣室的門
+    if (gate.i >= 0) {
+      for (const k of [gate.i, (gate.i + 1) % towers]) {
+        const t = towerSpots[k];
+        const d = { pos: [t.x + Math.sin(t.face) * 3.36, t.gy, t.z + Math.cos(t.face) * 3.36] as [number, number, number], face: t.face, name: '魁地奇球場' };
+        doorDecal(b, d, 1.8, 2.9, 0.02);
+        PITCH_DOORS.push(d);
       }
     }
     for (let i = 0; i < towers; i++) {
@@ -446,7 +450,8 @@ export function buildGrounds(): { built: Built[]; extras: THREE.Object3D[]; hand
     // 車站小屋
     const sx = px + sideX * side * 9;
     const sz = pz + sideZ * side * 9;
-    b.wing({ x: sx, z: sz, y: p.y + 0.6, w: 26, d: 8, h: 5, ry, roofH: 4.6, rows: 1, spacing: 3.6, winW: 1.2, winH: 2, winY: 1.4, tint: PLASTER, found: 6, chimneys: 2 });
+    b.wing({ x: sx, z: sz, y: p.y + 0.6, w: 26, d: 8, h: 5, ry, roofH: 4.6, rows: 1, spacing: 3.6, winW: 1.2, winH: 2, winY: 1.4, tint: PLASTER, found: 6, chimneys: 2, noBody: true, skipWin: (wx, wz) => Math.hypot(wx - sx, wz - sz) < 1.5 });
+    stationInterior(b, { x: sx, z: sz, y: p.y + 0.6, w: 26, d: 8, ry }, side > 0 ? 'N' : 'S', PLASTER);
     b.box('matte', 5, 0.9, 0.2, px, p.y + 3.6, pz, ry, col(0.3, 0.05, 0.04));
     // 鐵軌盡頭的止衝擋
     samplePath(rail, rail.length - 3, p, d);
@@ -498,7 +503,22 @@ export function buildGrounds(): { built: Built[]; extras: THREE.Object3D[]; hand
       const fy = heightAt(fx, fz);
       b.beam('wood', V(fx, fy - 0.3, fz), V(fx + (b.rng() - 0.5) * 0.6, fy + 1.3 + b.rng() * 0.4, fz + (b.rng() - 0.5) * 0.6), 0.13, WD);
     }
+    doorDecal(b, SHACK_DOOR, 1.6, 2.6, 0.03);
     done('shack', b);
+  }
+  // 渾拍柳樹根部的地道口
+  {
+    const b = new Builder(48);
+    const [wx, wy, wz] = WILLOW_DOOR.pos;
+    const nx = Math.sin(WILLOW_DOOR.face);
+    const nz = Math.cos(WILLOW_DOOR.face);
+    const g = new THREE.SphereGeometry(2.2, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2);
+    g.scale(1, 0.75, 1.2);
+    b.add('matte', g, mat4(wx - nx * 1.0, wy - 0.3, wz - nz * 1.0, WILLOW_DOOR.face), col(0.22, 0.16, 0.1));
+    b.add('matte', new THREE.PlaneGeometry(1.4, 1.1), mat4(wx + nx * 0.95, wy + 0.45, wz + nz * 0.95, WILLOW_DOOR.face, -0.35), col(0.01, 0.008, 0.006));
+    for (let k = 0; k < 4; k++) b.beam('wood', V(wx - nx * 1.2 + (k - 1.5) * 0.6 * nz, wy + 1.4, wz - nz * 1.2 - (k - 1.5) * 0.6 * nx), V(wx + nx * (0.8 + k * 0.2) + (k - 1.5) * 0.9 * nz, wy - 0.2, wz + nz * (0.8 + k * 0.2) - (k - 1.5) * 0.9 * nx), 0.18, col(0.4, 0.3, 0.2));
+    b.sphere('matte', 0.16, wx - nx * 0.2 + nz * 0.8, wy + 1.0, wz - nz * 0.2 - nx * 0.8, col(0.35, 0.25, 0.15));
+    done('willowTunnel', b);
   }
 
   // ================================================================ 鐵道高架橋與鐵軌

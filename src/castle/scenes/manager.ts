@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { Environment } from '../../environment/environment';
+import { U } from '../../core/globals';
 import { SCENES, PORTALS, SIGNS, type SceneDef, type PortalDef } from './registry';
 
 const POOL = 6;
@@ -10,6 +11,8 @@ export class SceneManager {
   readonly group = new THREE.Group();
   active: SceneDef | null = null;
   onEnter?: (s: SceneDef) => void;
+  /** 延遲建造的場景建好之後（用來加入碰撞） */
+  onBuilt?: (g: THREE.Object3D) => void;
   private pool: THREE.PointLight[] = [];
   private cand: { l: SceneDef['lights'][number]; d: number; k: number }[] = [];
 
@@ -28,6 +31,22 @@ export class SceneManager {
       }
     }
     for (const sign of SIGNS) this.group.add(makeSign(sign.text, sign.pos, sign.ry));
+  }
+
+  /** 延遲建造的場景：第一次需要時才生成 */
+  ensure(s: SceneDef | null) {
+    if (!s || s.group || !s.build) return;
+    const g = s.build();
+    s.build = undefined;
+    s.group = g;
+    if (s.pocket) g.visible = false;
+    this.group.add(g);
+    this.onBuilt?.(g);
+  }
+
+  /** 傳送前先把目的地的場景建好，角色才有地板可以站 */
+  prepare(x: number, y: number, z: number) {
+    this.ensure(this.sceneAt(_v.set(x, y + 0.5, z)));
   }
 
   sceneAt(p: THREE.Vector3): SceneDef | null {
@@ -54,6 +73,7 @@ export class SceneManager {
     const camAny = this.sceneAt(cam);
     const camScene = camAny && !camAny.outdoor ? camAny : null;
     const here = player ? (this.sceneAt(player) ?? camAny) : camAny;
+    this.ensure(here);
     if (here !== this.active) {
       this.active = here;
       if (here && here.name) this.onEnter?.(here);
@@ -77,7 +97,7 @@ export class SceneManager {
       const near = s.box.distanceToPoint(cam);
       if (near > 40) continue;
       const lit = (o: SceneDef | null) => !!o && (s === o || (!!s.zone && s.zone === o.zone));
-      const k = lit(camScene) || lit(here) ? 1 : 0.06;
+      const k = (lit(camScene) || lit(here) ? 1 : 0.06) * (1 + ((s.nightScale ?? 1) - 1) * U.uNight.value);
       for (const l of s.lights) cand.push({ l, d: _v.set(l.pos[0], l.pos[1], l.pos[2]).distanceToSquared(cam) / (k * k), k });
     }
     cand.sort((a, b) => a.d - b.d);

@@ -67,3 +67,45 @@ export function honeydukesDoor(): DoorEnd {
   honey = { pos: [x, heightAt(x, z), z], face: Math.atan2(-d.z, d.x), name: '活米村' };
   return honey;
 }
+
+export interface WingShape {
+  x: number;
+  z: number;
+  w: number;
+  d: number;
+  ry?: number;
+  y?: number;
+}
+/**
+ * 廂房外牆上的門：side 是廂房自己的方向（S=+Z、N=-Z、E=+X、W=-X），along 是沿牆的位置。
+ * 回傳的 DoorEnd 面向屋外（從門走出來的方向）。
+ */
+export function wingDoor(b: Builder | null, o: WingShape, side: 'N' | 'S' | 'E' | 'W', along: number, name: string, w = 2, h = 3.2, off = 0.46): DoorEnd {
+  const ry = o.ry ?? 0;
+  const [lx, lz, a] =
+    side === 'S' ? [along, o.d / 2 + off, 0] : side === 'N' ? [along, -o.d / 2 - off, Math.PI] : side === 'E' ? [o.w / 2 + off, along, Math.PI / 2] : [-o.w / 2 - off, along, -Math.PI / 2];
+  const c = Math.cos(ry);
+  const s = Math.sin(ry);
+  const x = o.x + lx * c + lz * s;
+  const z = o.z - lx * s + lz * c;
+  const d: DoorEnd = { pos: [x, o.y ?? PL, z], face: ry + a, name };
+  if (b) doorDecal(b, d, w, h, 0.04);
+  return d;
+}
+
+/** 渾拍柳樹根部的地道口（朝城堡那一側） */
+export const WILLOW_DOOR: DoorEnd = (() => {
+  const x = STAMPS.willow.x - 3.4;
+  const z = STAMPS.willow.z;
+  return { pos: [x, heightAt(x, z), z], face: -Math.PI / 2, name: '渾拍柳樹', sign: false };
+})();
+
+/** 尖叫屋一樓的正門 */
+export const SHACK_SHAPE: WingShape = (() => {
+  const sh = STAMPS.shack;
+  return { x: sh.x, z: sh.z, w: 10, d: 8, ry: 0.1, y: heightAt(sh.x, sh.z) };
+})();
+export const SHACK_DOOR: DoorEnd = wingDoor(null, SHACK_SHAPE, 'S', 2.6, '尖叫屋', 1.6, 2.6, 0.03);
+
+/** 魁地奇球場兩座看台塔底的更衣室門：由 grounds.ts 建看台時填入 */
+export const PITCH_DOORS: DoorEnd[] = [];

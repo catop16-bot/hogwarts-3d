@@ -148,6 +148,7 @@ export function hospitalInterior(b: Builder) {
     ],
     spawn: [(x0 + x1) / 2, F, 52, Math.PI],
     ambient: 0.6,
+    nightScale: 0.35,
   });
 }
 

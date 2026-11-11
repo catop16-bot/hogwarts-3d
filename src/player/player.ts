@@ -38,6 +38,10 @@ const SPAWNS: Record<string, [number, number, number?]> = {
 };
 
 /** 第三人稱角色：移動、碰撞、騎掃帚、游泳，以及跟隨鏡頭 */
+const _side = new THREE.Vector3();
+const _orig = new THREE.Vector3();
+const RAYS: [number, number][] = [[0, 0], [0.32, 0.22], [-0.32, 0.22], [0.32, -0.22], [-0.32, -0.22]];
+
 export class Player {
   readonly character = new Character();
   readonly pos = new THREE.Vector3(-160, 70.3, 72);
@@ -48,6 +52,8 @@ export class Player {
   house = 0;
   /** 獨立的室內場景裡不能騎掃帚 */
   noFly = false;
+  /** 在室內：鏡頭拉近，免得一直撞牆 */
+  indoor = false;
   onChange?: () => void;
 
   private yaw = Math.PI / 2;
@@ -61,7 +67,7 @@ export class Player {
   private wasSwimming = false;
 
   constructor(
-    private camera: THREE.PerspectiveCamera,
+    readonly camera: THREE.PerspectiveCamera,
     private dom: HTMLElement,
     private world: CollisionWorld,
     private rig: CameraRig,
@@ -97,6 +103,11 @@ export class Player {
       },
       { passive: false },
     );
+  }
+
+  /** 角色面向（0 = +Z） */
+  get heading() {
+    return this.yaw;
   }
 
   setHouse(i: number) {
@@ -202,6 +213,15 @@ export class Player {
     const sprint = this.has('ShiftLeft', 'ShiftRight');
     // 不拖曳時，橫向移動會讓鏡頭慢慢轉到角色身後
     if (!this.dragging && r !== 0 && f >= 0) this.camYaw -= r * (this.mode === 'broom' ? 1.1 : 0.75) * dt;
+    // 往前走時，鏡頭慢慢繞回角色身後（拖曳視角時不干擾）
+    if (!this.dragging && f > 0 && this.mode !== 'broom') {
+      const hsNow = Math.hypot(this.vel.x, this.vel.z);
+      if (hsNow > 1) {
+        const want = this.yaw + Math.PI;
+        const d = Math.atan2(Math.sin(want - this.camYaw), Math.cos(want - this.camYaw));
+        this.camYaw += d * Math.min(1, dt * (this.indoor ? 1.6 : 0.9));
+      }
+    }
     const sy = Math.sin(this.camYaw);
     const cy = Math.cos(this.camYaw);
     const speedNow = Math.hypot(this.vel.x, this.vel.z, this.mode === 'broom' ? this.vel.y : 0);
@@ -219,7 +239,7 @@ export class Player {
         const sp = sprint ? 58 : 24;
         let wx = (-sy * cp * f + cy * r * 0.6) * sp;
         let wz = (-cy * cp * f - sy * r * 0.6) * sp;
-        let wy = Math.sin(pitch) * f * sp + ((this.has('Space') ? 1 : 0) - (this.has('KeyC', 'ControlLeft', 'KeyQ') ? 1 : 0)) * 12;
+        let wy = Math.sin(pitch) * f * sp + ((this.has('Space') ? 1 : 0) - (this.has('KeyC', 'ControlLeft') ? 1 : 0)) * 12;
         const k = 1 - Math.exp(-h * 2.6);
         v.x += (wx - v.x) * k;
         v.y += (wy - v.y) * k;
@@ -327,7 +347,7 @@ export class Player {
     const ch = this.character;
     ch.root.position.copy(this.pos);
     ch.root.rotation.y = this.yaw;
-    ch.animate(dt, { speed: hs, vy: this.vel.y, grounded: this.grounded, mode: swimming ? 'swim' : this.mode, bank: this.bank });
+    ch.animate(dt, { speed: hs, vy: this.vel.y, grounded: this.grounded, mode: swimming ? 'swim' : this.mode, bank: this.bank, turn: dt > 0 ? (turn * Math.min(1, dt * 11)) / dt : 0 });
 
     this.updateCamera(dt);
   }
@@ -338,10 +358,15 @@ export class Player {
     _dir.set(Math.sin(this.camYaw) * cp, Math.sin(this.camPitch), Math.cos(this.camYaw) * cp);
     const flying = this.mode === 'broom';
     _target.set(this.pos.x, this.pos.y + (flying ? 1.25 : 1.5), this.pos.z);
-    const want = this.camDist * (flying ? 1.35 : 1);
+    const want = this.indoor && !flying ? Math.min(this.camDist, 3.6) : this.camDist * (flying ? 1.35 : 1);
     let limit = want;
-    const hit = this.world.rayDistance(_target, _dir, want + 0.4);
-    if (hit != null) limit = Math.min(limit, hit - 0.3);
+    // 除了正中央，再往四個角各打一條射線，鏡頭邊緣才不會鑽進牆裡
+    _side.set(_dir.z, 0, -_dir.x).normalize();
+    for (const [sx, sy] of RAYS) {
+      _orig.copy(_target).addScaledVector(_side, sx).setY(_target.y + sy);
+      const hit = this.world.rayDistance(_orig, _dir, want + 0.4);
+      if (hit != null) limit = Math.min(limit, hit - 0.3);
+    }
     // 別讓鏡頭鑽進地形
     for (let i = 1; i <= 6; i++) {
       const d = (want * i) / 6;

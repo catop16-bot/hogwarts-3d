@@ -21,9 +21,13 @@ export interface SceneDef {
   zone?: string;
   /** 天光的比例（預設 0.42） */
   ambient?: number;
+  /** 夜裡燈光的倍率（預設 1） */
+  nightScale?: number;
   /** 露天的場景：照常有陽光與雨雪，只是列入清單 */
   outdoor?: boolean;
   group?: THREE.Object3D;
+  /** 延遲建造：第一次有人要進去時才呼叫 */
+  build?: () => THREE.Object3D;
   animate?: (time: number) => void;
 }
 export interface PortalDef {

@@ -124,3 +124,57 @@ body.tour .modehint { bottom: 9%; }
   .timebar { flex-wrap: wrap; justify-content: center; gap: 10px; }
   .panel.right { width: min(340px, calc(100% - 32px)); }
 }
+
+/* 地圖 */
+.mapview { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(92vw, 86vh, 820px); padding: 14px 16px 12px; z-index: 20; display: flex; flex-direction: column; gap: 10px; }
+.mapview.hidden { display: none; }
+.map-head { display: flex; align-items: center; gap: 12px; }
+.map-head h3 { margin: 0; font-size: 14px; letter-spacing: 0.3em; color: var(--gold); flex: 1; }
+.map-body { position: relative; width: 100%; aspect-ratio: 1; border-radius: 8px; overflow: hidden; border: 1px solid var(--gold-dim); background: #c9b48a; }
+.map-body img { width: 100%; height: 100%; display: block; user-select: none; -webkit-user-drag: none; }
+.map-layer { position: absolute; inset: 0; }
+.map-dot { position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; border: 2px solid #3a2810; background: #e9c45c; box-shadow: 0 0 0 2px rgba(255, 240, 200, 0.5); cursor: pointer; padding: 0; font: 600 9px/10px var(--display); color: #2a1c08; }
+.map-dot.many { width: 18px; height: 18px; margin: -9px 0 0 -9px; }
+.map-dot:hover { background: #fff0b8; transform: scale(1.25); }
+.map-me { position: absolute; width: 0; height: 0; border-left: 7px solid transparent; border-right: 7px solid transparent; border-bottom: 18px solid #c0281e; filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.9)); pointer-events: none; }
+.map-pop { position: absolute; transform: translate(-50%, 12px); background: rgba(14, 14, 20, 0.95); border: 1px solid var(--gold-dim); border-radius: 8px; padding: 6px; z-index: 2; max-height: 240px; overflow: auto; min-width: 180px; }
+.map-pop.hidden { display: none; }
+.map-pop-list button { display: flex; justify-content: space-between; gap: 14px; width: 100%; background: none; border: 0; color: #eee; padding: 6px 8px; cursor: pointer; font: inherit; font-size: 13px; text-align: left; border-radius: 5px; }
+.map-pop-list button:hover { background: rgba(217, 189, 122, 0.18); }
+.map-pop-list b { font-weight: 500; }
+.map-pop-list span { color: var(--gold); white-space: nowrap; }
+/* 附近的門 */
+.nearby { position: absolute; left: 50%; top: 92px; transform: translateX(-50%); background: rgba(10, 12, 18, 0.6); border: 1px solid rgba(156, 134, 84, 0.5); border-radius: 999px; padding: 5px 14px 5px 10px; font-size: 13px; letter-spacing: 0.05em; color: #ddd; pointer-events: none !important; z-index: 2; white-space: nowrap; display: flex; align-items: center; gap: 8px; }
+.nearby.hidden { display: none; }
+.nearby i { font-style: normal; color: var(--gold); display: inline-block; transition: transform 0.15s linear; }
+
+/* 可收合的面板 */
+.fold-btn { background: none; border: 0; color: var(--gold); font-size: 12px; letter-spacing: 0.2em; padding: 0; text-align: left; display: flex; align-items: center; gap: 6px; }
+.fold-btn i { font-style: normal; display: inline-block; transition: transform 0.2s; }
+.folded .fold-btn i { transform: rotate(-90deg); }
+.walkbar.folded { width: auto; padding: 8px 12px; }
+.walkbar.folded > *:not(.fold-btn) { display: none !important; }
+.timebar .fold-btn { position: absolute; right: 8px; top: 6px; font-size: 13px; }
+.timebar.folded { padding: 8px 34px 8px 14px; gap: 8px; }
+.timebar.folded .sliders, .timebar.folded .controls, .timebar.folded .clock-date { display: none; }
+.timebar.folded .clock { min-width: 0; }
+.timebar.folded .clock-time { font-size: 20px; }
+
+/* 窄螢幕 */
+@media (max-width: 760px), (max-aspect-ratio: 4/5) {
+  .tool .tl { display: none; }
+  .tool { padding: 6px 10px; }
+  .brand-title { font-size: 18px; letter-spacing: 0.2em; }
+  .brand-sub { display: none; }
+  .topbar { left: 120px; }
+  .panel.left { display: none; }
+  .walkbar { top: 100px; bottom: auto; left: 10px; width: min(250px, calc(100% - 20px)); max-height: calc(100% - 150px); overflow-y: auto; }
+  .walkbar .note { display: none; }
+  .timebar { bottom: 10px; max-width: calc(100% - 20px); flex-wrap: wrap; justify-content: center; }
+  .sliders { width: min(250px, 70vw); }
+  .prompt { bottom: 90px; font-size: 14px; }
+  .nearby { top: 146px; }
+  .toast { top: 104px; max-width: calc(100% - 24px); }
+  .panel.right { left: 10px; right: 10px; width: auto; top: 58px; max-height: calc(100% - 140px); }
+  .pop { left: 10px; right: 10px; width: auto; }
+}

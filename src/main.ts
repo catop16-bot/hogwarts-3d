@@ -20,6 +20,10 @@ import { buildPublicPockets } from './castle/scenes/public';
 import { buildClassroomPockets } from './castle/scenes/classrooms';
 import { buildHousePockets } from './castle/scenes/houses';
 import { buildSecretPockets } from './castle/scenes/secrets';
+import { buildCampusPockets } from './castle/scenes/campus';
+import { buildTowerPockets } from './castle/scenes/towers';
+import { buildWingPockets } from './castle/scenes/wings';
+import { Grass } from './world/grass';
 import { SceneManager } from './castle/scenes/manager';
 import { SCENES, PORTALS } from './castle/scenes/registry';
 import { CollisionWorld } from './player/collision';
@@ -80,14 +84,17 @@ async function boot() {
   buildClassroomPockets();
   buildHousePockets();
   buildSecretPockets();
-  const scenes = new SceneManager();
-  scene.add(scenes.group);
+  buildTowerPockets();
+  buildWingPockets();
 
   lap('castle');
   await step(56, '修築道路、村莊與魁地奇球場…');
   const grounds = buildGrounds();
   grounds.built.forEach((b) => landmarkRoot.add(b.group));
   grounds.extras.forEach((o) => scene.add(o));
+  buildCampusPockets();
+  const scenes = new SceneManager();
+  scene.add(scenes.group);
 
   lap('grounds');
   await step(70, '栽下禁忌森林…');
@@ -111,6 +118,9 @@ async function boot() {
   const world = new CollisionWorld();
   [...castle, ...grounds.built].forEach((b) => world.add(b.group));
   world.add(scenes.group);
+  scenes.onBuilt = (g) => world.add(g);
+  const grass = new Grass(world);
+  scene.add(grass.mesh);
   const player = new Player(camera, canvas, world, rig);
   scene.add(player.character.root);
 
@@ -151,6 +161,8 @@ async function boot() {
     },
     getStats: () => ({ fps, calls: renderer.info.render.calls, tris: renderer.info.render.triangles }),
     getActive: () => events.active,
+    renderer,
+    buildings: landmarkRoot,
   });
   applyQuality();
 
@@ -184,6 +196,8 @@ async function boot() {
     interiors.update(U.uTime.value);
     scenes.update(dt, U.uTime.value, camera.position, walking ? player.pos : null, env);
     player.noFly = !!scenes.active?.pocket;
+    player.indoor = !!scenes.active && !scenes.active.outdoor;
+    grass.update(camera.position);
     const ph = renderer.domElement.height;
     env.update(dt, camera, rig.focus, rig.viewDist, ph);
     events.update(dt, env, camera, ph);

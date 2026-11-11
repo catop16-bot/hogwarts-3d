@@ -8,7 +8,9 @@ import { QUALITY, type QualityName } from '../core/quality';
 import type { Player } from '../player/player';
 import { HOUSES } from '../player/character';
 import type { SceneManager } from '../castle/scenes/manager';
-import { SCENES, type PortalDef } from '../castle/scenes/registry';
+import * as THREE from 'three';
+import { SCENES, PORTALS, type PortalDef } from '../castle/scenes/registry';
+import { MapView } from './map';
 
 const $ = <T extends HTMLElement>(sel: string, root: ParentNode = document) => root.querySelector(sel) as T;
 const SPEED_LABELS = ['⏸', '1×', '1 分/秒', '10 分/秒', '1 時/秒'];
@@ -25,6 +27,8 @@ export interface HudDeps {
   setQuality: (q: QualityName) => void;
   getStats: () => { fps: number; calls: number; tris: number };
   getActive: () => string[];
+  renderer: THREE.WebGLRenderer;
+  buildings: THREE.Object3D;
 }
 
 export class Hud {
@@ -35,6 +39,8 @@ export class Hud {
   private toastTimer = 0;
   private lastActive = '';
   private scrubbing = false;
+  private map!: MapView;
+  private nearby: PortalDef | null = null;
 
   constructor(private d: HudDeps) {
     this.root.innerHTML = this.template();
@@ -43,6 +49,13 @@ export class Hud {
     this.toastEl = $('#toast');
     this.buildList();
     this.buildLabels();
+    this.map = new MapView({
+      renderer: d.renderer,
+      buildings: d.buildings,
+      getPlayer: () => ({ x: d.player.pos.x, z: d.player.pos.z, yaw: d.player.heading, active: d.rig.mode === 'walk' }),
+      travel: (to) => this.travel(to),
+    });
+    this.root.appendChild(this.map.el);
     this.bind();
     this.setMode(d.rig.mode);
   }
@@ -55,12 +68,13 @@ export class Hud {
     return `
     <header class="brand"><div class="brand-title">霍格沃茲</div><div class="brand-sub">HOGWARTS · 3D 觀覽</div></header>
     <nav class="topbar">
-      <button class="tool" id="btn-list" title="地標清單">☰ 地標</button>
-      <button class="tool" id="btn-labels" title="顯示／隱藏標籤 (L)">◈ 標籤</button>
-      <button class="tool" id="btn-walk" title="化身學生，在校園裡漫遊 (G)">🚶 漫遊</button>
-      <button class="tool" id="btn-fly" title="自由飛行 (F)">✈ 飛行</button>
-      <button class="tool" id="btn-tour" title="電影運鏡導覽 (T)">▶ 導覽</button>
-      <button class="tool" id="btn-events" title="校曆上的特別時刻">✦ 事件</button>
+      <button class="tool" id="btn-list" title="地標清單">☰ <span class="tl">地標</span></button>
+      <button class="tool" id="btn-map" title="城堡與校園地圖，點入口直接前往 (M)">🗺 <span class="tl">地圖</span></button>
+      <button class="tool" id="btn-labels" title="顯示／隱藏標籤 (L)">◈ <span class="tl">標籤</span></button>
+      <button class="tool" id="btn-walk" title="化身學生，在校園裡漫遊 (G)">🚶 <span class="tl">漫遊</span></button>
+      <button class="tool" id="btn-fly" title="自由飛行 (F)">✈ <span class="tl">飛行</span></button>
+      <button class="tool" id="btn-tour" title="電影運鏡導覽 (T)">▶ <span class="tl">導覽</span></button>
+      <button class="tool" id="btn-events" title="校曆上的特別時刻">✦ <span class="tl">事件</span></button>
       <button class="tool" id="btn-settings" title="畫質設定">⚙</button>
       <button class="tool" id="btn-hide" title="隱藏介面 (H)">⤢</button>
     </nav>
@@ -77,7 +91,8 @@ export class Hud {
       <h3>操作</h3>
       <p class="note">拖曳旋轉 · 滾輪縮放 · 右鍵拖曳平移<br/>點擊建築查看介紹<br/>飛行模式：WASD 移動、Q／E 升降、Shift 加速、拖曳轉向<br/>漫遊模式（G）：WASD 移動、Shift 奔跑、空白鍵跳躍、F 騎掃帚、Q 點亮魔杖、E 進門、拖曳轉視角、滾輪拉遠近<br/>空白鍵暫停時間 · H 隱藏介面</p>
     </div>
-    <div class="panel walkbar hidden" id="walkbar">
+    <div class="panel walkbar hidden fold" id="walkbar">
+      <button class="fold-btn" data-fold="walkbar" title="收合／展開">漫遊選單 <i>▾</i></button>
       <h3>學院</h3>
       <div class="row">${HOUSES.map((h, i) => `<button class="chip hs" data-hs="${i}" style="--hc:#${h.primary.toString(16).padStart(6, '0')}">${h.name}</button>`).join('')}</div>
       <div class="row"><button class="chip" id="btn-broom" title="騎上／跳下飛天掃帚 (F)">🧹 掃帚</button><button class="chip" id="btn-lumos" title="點亮魔杖 (Q)">✨ 路摸思</button><button class="chip" id="btn-exit" title="回到觀覽模式 (G)">離開漫遊</button></div>
@@ -85,7 +100,8 @@ export class Hud {
       <select id="goto"><option value="">選擇城堡裡的場景…</option>${SCENES.filter((s) => s.name).map((s) => `<option value="${s.id}">${s.name}</option>`).join('')}</select>
       <p class="note" id="walk-help"></p>
     </div>
-    <div class="timebar panel">
+    <div class="timebar panel fold" id="timebar">
+      <button class="fold-btn" data-fold="timebar" title="收合／展開時間列"><i>▾</i></button>
       <div class="clock">
         <div class="clock-time" id="t-time">--:--</div>
         <div class="clock-date"><span id="t-date"></span> · <span id="t-season"></span> · <span id="t-moon"></span></div>
@@ -100,6 +116,7 @@ export class Hud {
       </div>
     </div>
     <div class="prompt hidden" id="prompt"></div>
+    <div class="nearby hidden" id="nearby"><i>▲</i><span></span></div>
     <div id="fade"></div>
     <div id="labels"></div>
     <div class="tooltip hidden" id="tip"></div>
@@ -143,7 +160,29 @@ export class Hud {
     }
   }
 
+  /** 窄螢幕（手機直立、窄的面板）：時間列與漫遊選單預設收合 */
+  private setupFolds() {
+    const narrow = innerWidth < 760 || innerHeight > innerWidth * 1.15;
+    this.root.querySelectorAll<HTMLElement>('.fold').forEach((el) => {
+      let saved: string | null = null;
+      try {
+        saved = localStorage.getItem(`hogwarts.fold.${el.id}`);
+      } catch {}
+      el.classList.toggle('folded', saved != null ? saved === '1' : narrow);
+    });
+    this.root.querySelectorAll<HTMLElement>('.fold-btn').forEach((b) => {
+      b.onclick = () => {
+        const el = $(`#${b.dataset.fold}`);
+        el.classList.toggle('folded');
+        try {
+          localStorage.setItem(`hogwarts.fold.${el.id}`, el.classList.contains('folded') ? '1' : '0');
+        } catch {}
+      };
+    });
+  }
+
   private bind() {
+    this.setupFolds();
     const { env, rig, landmarks } = this.d;
     const toggle = (id: string, others: string[] = []) => {
       others.forEach((o) => $(o).classList.add('hidden'));
@@ -154,6 +193,7 @@ export class Hud {
     const { player } = this.d;
     const toggleWalk = () => (rig.mode === 'walk' ? player.exit() : player.enter());
     $('#btn-walk').onclick = toggleWalk;
+    $('#btn-map').onclick = () => this.map.toggle();
     $('#btn-exit').onclick = () => player.exit();
     $('#btn-broom').onclick = () => this.broom();
     const goto = $<HTMLSelectElement>('#goto');
@@ -233,6 +273,8 @@ export class Hud {
       else if (e.code === 'KeyG') toggleWalk();
       else if (e.code === 'KeyF' && rig.mode === 'walk') this.broom();
       else if (e.code === 'KeyQ' && rig.mode === 'walk') player.toggleLumos();
+      else if (e.code === 'KeyM') this.map.toggle();
+      else if (e.code === 'Escape' && this.map.open) this.map.toggle(false);
       else if (e.code === 'KeyE' && rig.mode === 'walk') {
         if (this.portal) this.travel(this.portal.to);
       }
@@ -287,12 +329,42 @@ export class Hud {
     const fade = $('#fade');
     fade.classList.add('on');
     window.setTimeout(() => {
+      this.d.scenes.prepare(to[0], to[1], to[2]);
       this.d.player.enter(to[0], to[2], to[1] + 0.5, to[3]);
       window.setTimeout(() => {
         fade.classList.remove('on');
         this.traveling = false;
       }, 180);
     }, 260);
+  }
+
+  /** 附近（35 公尺內）最近的一扇門：在畫面上用箭頭指出方向 */
+  private updateNearby(on: boolean) {
+    const el = $('#nearby');
+    let best: PortalDef | null = null;
+    if (on) {
+      const p = this.d.player.pos;
+      let bd = 35 * 35;
+      for (const q of PORTALS) {
+        if (Math.abs(q.pos[1] - p.y) > 3.5) continue;
+        const d = (q.pos[0] - p.x) ** 2 + (q.pos[2] - p.z) ** 2;
+        if (d < bd && d > 2.4 * 2.4) {
+          bd = d;
+          best = q;
+        }
+      }
+    }
+    if (best !== this.nearby) {
+      this.nearby = best;
+      el.classList.toggle('hidden', !best);
+    }
+    if (!best) return;
+    const cam = this.d.player.camera;
+    _nv.set(best.pos[0], best.pos[1] + 1, best.pos[2]).applyMatrix4(cam.matrixWorldInverse);
+    const ang = Math.atan2(_nv.x, -_nv.z);
+    const dist = Math.hypot(best.pos[0] - this.d.player.pos.x, best.pos[2] - this.d.player.pos.z);
+    (el.firstElementChild as HTMLElement).style.transform = `rotate(${ang}rad)`;
+    (el.lastElementChild as HTMLElement).textContent = `${best.label} · ${dist.toFixed(0)} 公尺`;
   }
 
   private refreshWalk() {
@@ -303,7 +375,7 @@ export class Hud {
     $('#walk-help').innerHTML =
       p.mode === 'broom'
         ? 'W／S 前進後退，鏡頭朝哪就往哪飛<br/>A／D 轉向 · 空白鍵上升 · C 下降<br/>Shift 加速 · F 跳下掃帚'
-        : 'WASD 移動 · Shift 奔跑 · 空白鍵跳躍<br/>拖曳轉視角 · 滾輪拉遠近<br/>F 騎上掃帚 · Q 點亮魔杖 · G 離開<br/>走到門前按 E 進入';
+        : 'WASD 移動 · Shift 奔跑 · 空白鍵跳躍<br/>拖曳轉視角 · 滾輪拉遠近<br/>F 騎上掃帚 · Q 點亮魔杖 · G 離開<br/>走到門前按 E 進入 · M 地圖';
   }
 
   private showCard(l: Landmark | null) {
@@ -368,8 +440,12 @@ export class Hud {
       el.classList.toggle('hidden', !portal);
       if (portal) el.innerHTML = `<kbd>E</kbd> 前往 <b>${portal.label}</b>`;
     }
+    this.map.update();
+    this.updateNearby(walking && !portal);
     const act = this.d.getActive().filter((a) => a !== '聖誕佈置').join('、');
     if (act && act !== this.lastActive) this.toast(`✦ ${act}`, 5000);
     this.lastActive = act;
   }
 }
+
+const _nv = new THREE.Vector3();

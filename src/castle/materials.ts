@@ -384,7 +384,23 @@ function iwood() {
 }
 
 function iplain() {
-  return new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.72, metalness: 0, vertexColors: true, side: THREE.DoubleSide });
+  // 布料、家具、器物：加一點細微的紋理起伏；金色與銀灰色的器物比較亮滑，會反光
+  const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.72, metalness: 0, vertexColors: true, side: THREE.DoubleSide });
+  return patchMaterial(mat, {
+    key: 'iplain',
+    fragPars: /* glsl */ `float gShiny;`,
+    fragColor: /* glsl */ `
+      {
+        vec3 c = vColor.rgb;
+        float gold = step(0.7, c.r) * step(0.45, c.g) * step(c.b, 0.3) * step(c.g, c.r);
+        float steel = step(abs(c.r - c.g), 0.04) * step(abs(c.g - c.b), 0.06) * step(0.3, c.r) * step(c.r, 0.62);
+        gShiny = max(gold, steel);
+        float n1 = noiseTex(vWPos.xz * 2.7 + vWPos.y * 1.9).r;
+        float n2 = noiseTex(vec2(vWPos.x + vWPos.z, vWPos.y) * 7.0).g;
+        diffuseColor.rgb *= mix(0.88 + 0.24 * n1, 1.0, gShiny) * (0.95 + 0.1 * n2);
+      }`,
+    fragRough: /* glsl */ `roughnessFactor = mix(roughnessFactor, 0.3, gShiny);`,
+  });
 }
 
 function iglow() {

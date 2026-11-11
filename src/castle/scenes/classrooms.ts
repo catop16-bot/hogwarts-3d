@@ -16,7 +16,8 @@ const DUNGEON = col(0.62, 0.66, 0.72);
 export const DUNGEON_DOORS: Record<string, DoorEnd> = {};
 
 // ================================================================== 溫室（改建第一間玻璃溫室）
-export function greenhouseInterior(b: Builder, gx: number, gz: number) {
+/** v：0 一號溫室（魔蘋果）、1 二號溫室（一年級的藥草）、2 三號溫室（危險植物） */
+export function greenhouseInterior(b: Builder, gx: number, gz: number, v = 0) {
   const GT = col(0.9, 1.0, 0.95);
   const y = Y + 0.9;
   const hw = 17.5;
@@ -43,7 +44,19 @@ export function greenhouseInterior(b: Builder, gx: number, gz: number) {
       const q = p.at(x, 0.9, (rng() - 0.5) * 0.4);
       q.cyl('iplain', 0.2, 0.15, 0.3, 0, 0, 0, 8, POT);
       q.cyl('iplain', 0.18, 0.18, 0.02, 0, 0.29, 0, 8, SOIL);
-      if (i % 3 === 0) {
+      if (v === 1 && i % 2 === 0) {
+        // 巴波塊莖：黑綠色、長滿發亮膿包的矮胖植物
+        q.cyl('iplain', 0.12, 0.15, 0.3, 0, 0.3, 0, 7, col(0.06, 0.12, 0.05));
+        for (let k = 0; k < 4; k++) q.sphere('iglow', 0.035, Math.cos(k * 1.6) * 0.12, 0.45 + k * 0.04, Math.sin(k * 1.6) * 0.12, col(1.2, 1.1, 0.2));
+      } else if (v === 1) {
+        // 長著小尖牙的天竺葵
+        q.cyl('iplain', 0.015, 0.02, 0.35, 0, 0.3, 0, 4, LEAF[0]);
+        for (let k = 0; k < 5; k++) q.sphere('iplain', 0.07, Math.cos(k * 1.26) * 0.09, 0.68, Math.sin(k * 1.26) * 0.09, col(0.85, 0.25, 0.45), 0.8, 5);
+        q.sphere('iplain', 0.04, 0, 0.7, 0, WHITE, 1, 5);
+      } else if (v === 2 && i % 3 === 0) {
+        // 長成的魔蘋果：葉子更高、更大
+        for (let k = 0; k < 6; k++) q.geo('iplain', new THREE.ConeGeometry(0.1, 0.8, 4), Math.cos(k * 1.05) * 0.12, 0.7, Math.sin(k * 1.05) * 0.12, col(0.16, 0.26, 0.12), 0, Math.cos(k * 1.05) * 0.5, Math.sin(k * 1.05) * 0.5);
+      } else if (i % 3 === 0) {
         // 魔蘋果：一叢紫綠色的葉子
         for (let k = 0; k < 5; k++) q.geo('iplain', new THREE.ConeGeometry(0.07, 0.42, 4), Math.cos(k * 1.26) * 0.09, 0.5, Math.sin(k * 1.26) * 0.09, col(0.2, 0.28, 0.16), 0, Math.cos(k * 1.26) * 0.5, Math.sin(k * 1.26) * 0.5);
       } else {
@@ -54,7 +67,33 @@ export function greenhouseInterior(b: Builder, gx: number, gz: number) {
       }
     }
   }
-  {
+  if (v === 1) {
+    // 中央：養著鰓囊草的玻璃水槽
+    const p = new At(b, gx + 2, y, gz);
+    p.box('iwood', 20, 0.6, 1.6, 0, 0, 0);
+    p.box('iglow', 19.6, 0.9, 1.3, 0, 0.6, 0, col(0.01, 0.045, 0.05));
+    for (const z of [-0.68, 0.68]) p.box('iwood', 19.8, 0.12, 0.08, 0, 1.44, z, col(0.5, 0.4, 0.3));
+    for (let i = 0; i < 40; i++) p.box('iplain', 0.04, 0.4 + rng() * 0.5, 0.02, -9.5 + rng() * 19, 0.62, (rng() - 0.5) * 1.1, col(0.2, 0.45, 0.35), rng() * 3);
+  } else if (v === 2) {
+    // 中央：魔鬼網的深坑、毒觸手，盡頭是一株渾拍柳樹的幼苗
+    const p = new At(b, gx + 2, y, gz);
+    p.box('iwood', 24, 0.5, 1.6, 0, 0, 0);
+    p.box('iplain', 23.7, 0.04, 1.3, 0, 0.5, 0, col(0.03, 0.025, 0.02));
+    for (let i = 0; i < 70; i++) {
+      const x = -11.5 + rng() * 23;
+      p.geo('iplain', new THREE.CylinderGeometry(0.03, 0.04, 1.4 + rng() * 1.6, 4), x, 0.55, (rng() - 0.5) * 1.4, col(0.12, 0.15, 0.06), rng() * 6, Math.PI / 2 - 0.15, 0);
+    }
+    for (let i = 0; i < 4; i++) {
+      const x = -9 + i * 5;
+      p.cyl('iplain', 0.08, 0.12, 1.6, x, 0.5, 0, 6, col(0.25, 0.08, 0.12));
+      for (let k = 0; k < 5; k++) p.geo('iplain', new THREE.ConeGeometry(0.06, 1.5, 5), x, 2.0, 0, col(0.35, 0.1, 0.15), k * 1.25, 0.7, 0);
+    }
+    const t = new At(b, gx + 15.5, y, gz);
+    t.cyl('iplain', 0.7, 0.8, 0.6, 0, 0, 0, 10, POT);
+    t.geo('iplain', new THREE.CylinderGeometry(0.1, 0.18, 1.8, 6), 0, 1.4, 0, col(0.3, 0.22, 0.15), 0, 0.15, 0);
+    for (let k = 0; k < 6; k++) b.rod('iplain', V(gx + 15.5, y + 2.0, gz), V(gx + 15.5 + Math.cos(k) * 1.4, y + 2.6 + (k % 3) * 0.3, gz + Math.sin(k) * 1.4), 0.04, col(0.3, 0.22, 0.15), 4, 0.012);
+    t.box('iplain', 1.2, 0.5, 0.05, 0, 0.7, 1.0, col(0.7, 0.1, 0.08));
+  } else {
     const p = new At(b, gx + 2, y, gz);
     p.box('iwood', 24, 0.5, 1.6, 0, 0, 0);
     p.box('iplain', 23.7, 0.04, 1.3, 0, 0.5, 0, SOIL);
@@ -79,10 +118,15 @@ export function greenhouseInterior(b: Builder, gx: number, gz: number) {
     s.geo('iplain', new THREE.TorusGeometry(0.09, 0.02, 5, 10, Math.PI), -0.8 + i * 0.4, 0.92, 0, col(0.2, 0.2, 0.22));
     for (const k of [-1, 1]) s.sphere('iplain', 0.055, -0.8 + i * 0.4 + k * 0.09, 0.9, 0, col(0.75, 0.4, 0.5), 1, 6);
   }
+  const INFO = [
+    ['greenhouse', '溫室', '藥草學的教室。花台上一盆盆的是魔蘋果，拔出來之前記得先戴耳罩。'],
+    ['greenhouse2', '二號溫室', '一年級上藥草學的地方：會咬人的天竺葵、冒膿的巴波塊莖，中央的水槽養著鰓囊草。'],
+    ['greenhouse3', '三號溫室', '高年級才准進來：中央的坑裡是魔鬼網，毒觸手會伸手抓人，盡頭種著一株渾拍柳樹的幼苗。'],
+  ][v];
   registerScene({
-    id: 'greenhouse',
-    name: '溫室',
-    intro: '藥草學的教室。花台上一盆盆的是魔蘋果，拔出來之前記得先戴耳罩。',
+    id: INFO[0],
+    name: INFO[1],
+    intro: INFO[2],
     box: box3(gx - hw, y - 0.5, gz - hd, gx + hw, Y + 8, gz + hd),
     lights: [{ pos: [gx, Y + 4.4, gz], intensity: 60, dist: 26, color: 0xfff0d0 }],
     spawn: [gx - 14, y, gz, Math.PI / 2],
