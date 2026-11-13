@@ -66,7 +66,8 @@ async function boot() {
   const T0 = performance.now();
   const lap = (n: string) => console.info(`[載入] ${n} ${(performance.now() - T0).toFixed(0)}ms`);
   await step(6, '塑造蘇格蘭高地的山巒…');
-  scene.add(buildTerrain());
+  const terrain = buildTerrain();
+  scene.add(terrain);
 
   lap('terrain');
   await step(24, '注滿黑湖…');
@@ -166,6 +167,11 @@ async function boot() {
     },
     getStats: () => ({ fps, calls: renderer.info.render.calls, tris: renderer.info.render.triangles }),
     getActive: () => events.active,
+    getSaver: () => saver,
+    setSaver: (on) => {
+      saver = on;
+      localStorage.setItem('hogwarts.saver', on ? '1' : '0');
+    },
     renderer,
     buildings: landmarkRoot,
   });
@@ -180,7 +186,7 @@ async function boot() {
   let wasWalking = false;
   let fpsAcc = 0;
   let fpsN = 0;
-  (window as any).__hog = { scene, camera, rig, env, player, world, scenes, SCENES, PORTALS, renderer, water, post, landmarks, events, hud, get fps() { return fps; }, info: renderer.info };
+  (window as any).__hog = { scene, camera, rig, env, player, world, scenes, SCENES, PORTALS, renderer, water, post, landmarks, events, hud, get fps() { return fps; }, get frames() { return frameNo; }, info: renderer.info };
 
   function frame() {
     timer.update();
@@ -203,7 +209,21 @@ async function boot() {
     player.noFly = !!scenes.active?.pocket;
     player.indoor = !!scenes.active && !scenes.active.outdoor;
     grass.update(camera.position);
+    if (frameNo % 15 === 0) forest.userData.updateLod(camera.position, rig.focus);
     const ph = renderer.domElement.height;
+    // 省電：陰影貼圖與湖面倒影各自隔一幀才重畫（輪流分攤）；鏡頭在獨立的室內場景時兩者都不畫
+    frameNo++;
+    const pocket = camera.position.y > 1500;
+    // 鏡頭在獨立的室內場景時，整個戶外世界（地形、森林、城堡、湖）都不必畫
+    if (pocket !== wasPocket) {
+      wasPocket = pocket;
+      for (const o of outdoorRoots) o.visible = !pocket;
+    }
+    const doShadow = !pocket && frameNo % 2 === 0;
+    const doReflection = !pocket && env.indoor < 0.9 && frameNo % 2 === 1;
+    env.shadowHold = !doShadow;
+    renderer.shadowMap.autoUpdate = false;
+    renderer.shadowMap.needsUpdate = doShadow;
     env.update(dt, camera, rig.focus, rig.viewDist, ph);
     events.update(dt, env, camera, ph);
     water.material.uniforms.uLightColor.value.copy(env.sun.color).multiplyScalar(env.sun.intensity);
@@ -213,13 +233,13 @@ async function boot() {
     renderer.info.reset();
     // 倒影只需要畫出湖邊附近的樹
     const farTrees: THREE.Object3D[] = [];
-    if (water.reflectionEnabled) {
+    if (water.reflectionEnabled && doReflection) {
       for (const c of forest.children) {
         const bs = (c as THREE.InstancedMesh).boundingSphere!;
         if (bs.center.distanceTo(camera.position) - bs.radius > 1100) farTrees.push(c);
       }
     }
-    water.renderReflection(renderer, scene, camera, hiddenInReflection.concat(farTrees));
+    if (doReflection) water.renderReflection(renderer, scene, camera, hiddenInReflection.concat(farTrees));
     post.render(dt);
     landmarks.updateLabels(window.innerWidth, window.innerHeight);
     hud.update();
@@ -230,15 +250,49 @@ async function boot() {
       fpsAcc = 0;
       fpsN = 0;
     }
+    // 鏡頭有沒有在動：決定下一幀要不要全速
+    if (camera.position.distanceToSquared(prevCamPos) > 1e-6 || 1 - Math.abs(camera.quaternion.dot(prevCamQuat)) > 1e-9) lastActive = performance.now();
+    prevCamPos.copy(camera.position);
+    prevCamQuat.copy(camera.quaternion);
     lastFrame = performance.now();
-    cancelAnimationFrame(raf);
-    raf = requestAnimationFrame(frame);
   }
-  let raf = 0;
+  let frameNo = 0;
+  let wasPocket = false;
+  const outdoorRoots: THREE.Object3D[] = [terrain, water.mesh, landmarkRoot, interiors.group, dressing.group, forest, willow, events.group, grass.mesh, ...grounds.extras];
   let lastFrame = 0;
+  let lastActive = performance.now();
+  let held = 0;
+  const prevCamPos = new THREE.Vector3();
+  const prevCamQuat = new THREE.Quaternion();
+  const poke = () => (lastActive = performance.now());
+  for (const ev of ['pointerdown', 'pointermove', 'wheel', 'touchstart', 'touchmove', 'keydown'] as const) window.addEventListener(ev, poke, { passive: true, capture: true });
+  window.addEventListener('keydown', (e) => !e.repeat && held++, true);
+  window.addEventListener('keyup', () => (held = Math.max(0, held - 1)), true);
+  window.addEventListener('blur', () => (held = 0));
+  /**
+   * 幀率上限：操作中或鏡頭在動時 60；靜止不動超過兩秒降到 20；視窗不在前景時 12。
+   * 高更新率螢幕（120Hz）也一律壓在 60，免得白白多畫一倍。
+   */
+  function targetFps() {
+    if (!saver) return 60;
+    if (!document.hasFocus()) return 12;
+    return held > 0 || performance.now() - lastActive < 2000 ? 60 : 20;
+  }
+  let saver = localStorage.getItem('hogwarts.saver') !== '0';
+  let lastStart = 0;
+  function loop() {
+    requestAnimationFrame(loop);
+    const now = performance.now();
+    // 以「開始畫的時間」為準，免得畫一幀花掉的時間被算進間隔裡
+    const target = targetFps();
+    // 60：只擋掉 120Hz 螢幕多出來的那一半（間隔不到 10 毫秒的），不因為時間抖動誤跳幀
+    if (now - lastStart < (target >= 60 ? 10 : 1000 / target - 3)) return;
+    lastStart = now;
+    frame();
+  }
   // 開發時：分頁在背景時 requestAnimationFrame 會停擺，用計時器補幀，方便自動化測試
   if (import.meta.env.DEV) setInterval(() => performance.now() - lastFrame > 120 && frame(), 50);
-  frame();
+  loop();
 }
 
 boot().catch((err) => {

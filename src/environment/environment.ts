@@ -76,6 +76,8 @@ export class Environment {
   dayLight = 1; // 0 夜晚 .. 1 白天
   lightLevel = 1;
   shadowExtent = 400;
+  /** true 時這一幀不移動陰影視錐（陰影貼圖也不重畫），用來隔幀更新陰影 */
+  shadowHold = false;
   /** 鏡頭在室內的程度 0..1：室內不受天光直接照亮 */
   indoor = 0;
   /** 室內殘留的天光比例，以及陽光的倍率（獨立的室內場景沒有陽光） */
@@ -220,6 +222,7 @@ export class Environment {
     );
 
     // ---- 陰影視錐：跟著觀看焦點，範圍隨距離縮放並對齊貼圖格點
+    if (this.shadowHold) return;
     const steps = Math.round(Math.log(Math.max(120, Math.min(1500, viewDist * 0.9))) / Math.log(1.35));
     const extent = Math.pow(1.35, steps);
     this.shadowExtent = extent;

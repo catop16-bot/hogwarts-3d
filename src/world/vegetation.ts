@@ -27,18 +27,20 @@ function tag(g: THREE.BufferGeometry, color: THREE.Color | ((y: number) => THREE
   return ng;
 }
 
-function pineGeometry() {
+function pineGeometry(tiers = 5, seg = 7) {
   const parts: THREE.BufferGeometry[] = [];
   const trunk = new THREE.CylinderGeometry(0.012, 0.032, 0.5, 5, 1, true);
   trunk.translate(0, 0.25, 0);
   parts.push(tag(trunk, new THREE.Color(0.09, 0.06, 0.04), 0));
-  const tiers = 5;
+  const lod = tiers < 5;
+  // 遠景用：兩層大圓錐，輪廓與高度跟完整的樹一致
+  if (lod) parts.length = 0;
   for (let i = 0; i < tiers; i++) {
     const t = i / (tiers - 1);
-    const r = 0.25 - 0.17 * t;
-    const h = 0.34 - 0.08 * t;
-    const y = 0.18 + 0.6 * t * (1 - 0.12 * t);
-    const cone = new THREE.ConeGeometry(r, h, 7, 1, true);
+    const r = lod ? 0.27 - 0.1 * t : 0.25 - 0.17 * t;
+    const h = lod ? 0.5 - 0.05 * t : 0.34 - 0.08 * t;
+    const y = lod ? 0.14 + 0.38 * t : 0.18 + 0.6 * t * (1 - 0.12 * t);
+    const cone = new THREE.ConeGeometry(r, h, seg, 1, true);
     cone.rotateY(i * 0.7);
     cone.translate(0, y + h / 2, 0);
     const base = y;
@@ -47,7 +49,7 @@ function pineGeometry() {
   return mergeGeometries(parts)!;
 }
 
-function broadleafGeometry() {
+function broadleafGeometry(lod = false) {
   const parts: THREE.BufferGeometry[] = [];
   const trunk = new THREE.CylinderGeometry(0.03, 0.055, 0.5, 6, 1, true);
   trunk.translate(0, 0.25, 0);
@@ -58,6 +60,8 @@ function broadleafGeometry() {
     [-0.19, 0.6, -0.1, 0.22, 0],
     [0.03, 0.86, 0.05, 0.2, 0],
   ];
+  // 遠景用：一顆大的樹冠球就夠了
+  if (lod) blobs.splice(0, blobs.length, [0, 0.68, 0, 0.4, 0]);
   for (const [x, y, z, r, detail] of blobs) {
     const g = new THREE.IcosahedronGeometry(r, detail);
     g.scale(1.15, 0.85, 1.15);
@@ -162,6 +166,7 @@ export function buildForest(density: number, campus: [number, number, number, bo
   group.name = 'forest';
   const rng = makeRng(4242);
   const geos = { pine: pineGeometry(), broad: broadleafGeometry() };
+  const lods = { pine: pineGeometry(2, 5), broad: broadleafGeometry(true) };
   const mats = { pine: treeMaterial('pine'), broad: treeMaterial('broad') };
   const CELL = 420;
   const buckets = new Map<string, Bucket>();
@@ -241,8 +246,22 @@ export function buildForest(density: number, campus: [number, number, number, bo
     mesh.computeBoundingSphere();
     mesh.computeBoundingBox();
     mesh.name = `trees:${key}`;
+    mesh.userData.full = geos[type];
+    mesh.userData.lod = lods[type];
     group.add(mesh);
   }
+  /** 依距離切換：遠處的樹用簡化模型、而且不投影（遠到看不出差別） */
+  group.userData.updateLod = (cam: THREE.Vector3, focus: THREE.Vector3) => {
+    for (const c of group.children) {
+      const m = c as THREE.InstancedMesh;
+      const bs = m.boundingSphere!;
+      const d = bs.center.distanceTo(cam) - bs.radius;
+      const far = m.geometry === m.userData.lod ? d > 750 : d > 900;
+      const want = far ? m.userData.lod : m.userData.full;
+      if (m.geometry !== want) m.geometry = want;
+      m.castShadow = bs.center.distanceTo(focus) - bs.radius < 650;
+    }
+  };
   group.userData.count = count;
   return group;
 }

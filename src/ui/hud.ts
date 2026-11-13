@@ -27,6 +27,8 @@ export interface HudDeps {
   setQuality: (q: QualityName) => void;
   getStats: () => { fps: number; calls: number; tris: number };
   getActive: () => string[];
+  getSaver: () => boolean;
+  setSaver: (on: boolean) => void;
   renderer: THREE.WebGLRenderer;
   buildings: THREE.Object3D;
 }
@@ -87,6 +89,8 @@ export class Hud {
     <div class="panel pop hidden" id="settings">
       <h3>畫質</h3><div class="row">${quality}</div>
       <p class="note">「中」適合一般筆電；「高」會以原生解析度繪製並開啟完整的環境光遮蔽。</p>
+      <h3>省電</h3><div class="row"><button class="chip" id="btn-saver">省電模式</button></div>
+      <p class="note">開啟時：畫面靜止兩秒後降到每秒 20 幀，視窗不在前景時 12 幀，一有操作立刻回到 60。電腦發燙或風扇很吵時請保持開啟，並把畫質調到「低」。</p>
       <div class="stats" id="stats"></div>
       <h3>操作</h3>
       <p class="note">拖曳旋轉 · 滾輪縮放 · 右鍵拖曳平移<br/>點擊建築查看介紹<br/>飛行模式：WASD 移動、Q／E 升降、Shift 加速、拖曳轉向<br/>漫遊模式（G）：WASD 移動、Shift 奔跑、空白鍵跳躍、F 騎掃帚、Q 點亮魔杖、E 進門、拖曳轉視角、滾輪拉遠近<br/>空白鍵暫停時間 · H 隱藏介面</p>
@@ -244,6 +248,7 @@ export class Hud {
     this.root.querySelectorAll<HTMLElement>('.wx').forEach((b) => (b.onclick = () => env.weather.set(b.dataset.wx as WeatherKind)));
     $('#btn-auto').onclick = () => (env.weather.auto = !env.weather.auto);
     this.root.querySelectorAll<HTMLElement>('.ql').forEach((b) => (b.onclick = () => this.d.setQuality(b.dataset.ql as QualityName)));
+    $('#btn-saver').onclick = () => this.d.setSaver(!this.d.getSaver());
     this.root.querySelectorAll<HTMLElement>('.event').forEach((b) => {
       b.onclick = () => {
         const ev = EVENTS.find((e) => e.id === b.dataset.ev)!;
@@ -427,6 +432,7 @@ export class Hud {
     $('#wx-name').textContent = WEATHER[env.weather.kind].name;
     const q = this.d.getQuality();
     this.root.querySelectorAll<HTMLElement>('.ql').forEach((b) => b.classList.toggle('on', b.dataset.ql === q));
+    $('#btn-saver').classList.toggle('on', this.d.getSaver());
     if (!$('#settings').classList.contains('hidden')) {
       const s = this.d.getStats();
       $('#stats').textContent = `${s.fps.toFixed(0)} FPS · ${s.calls} 次繪製 · ${(s.tris / 1e6).toFixed(2)} 百萬三角形`;

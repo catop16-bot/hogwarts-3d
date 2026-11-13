@@ -313,6 +313,8 @@ export class MapView {
     tmp.overrideMaterial = new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.DoubleSide });
     const b = this.d.buildings;
     const parent = b.parent;
+    const wasVisible = b.visible;
+    b.visible = true;
     tmp.add(b);
     const prevTarget = r.getRenderTarget();
     const prevShadow = r.shadowMap.autoUpdate;
@@ -324,6 +326,7 @@ export class MapView {
     r.setRenderTarget(prevTarget);
     r.shadowMap.autoUpdate = prevShadow;
     parent?.add(b);
+    b.visible = wasVisible;
     rt.dispose();
     (tmp.overrideMaterial as THREE.Material).dispose();
     return out;

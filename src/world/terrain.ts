@@ -101,13 +101,34 @@ function buildLevel(lv: Level) {
     ring((t) => t * n1, true); // 西
     ring((t) => t * n1 + n, false); // 東
   }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
-  geo.setIndex(new THREE.BufferAttribute(new Uint32Array(idx), 1));
-  geo.computeBoundingSphere();
-  geo.computeBoundingBox();
-  return geo;
+  // 切成 K×K 塊：共用同一組頂點，各有自己的索引與包圍球，鏡頭與陰影看不到的塊就不必畫
+  const posAttr = new THREE.BufferAttribute(pos, 3);
+  const norAttr = new THREE.BufferAttribute(nor, 3);
+  const K = lv.inner > 0 ? 6 : 8;
+  const size = (2 * lv.R) / K;
+  const buckets: number[][] = Array.from({ length: K * K }, () => []);
+  for (let t = 0; t < idx.length; t += 3) {
+    const cx = (pos[idx[t] * 3] + pos[idx[t + 1] * 3] + pos[idx[t + 2] * 3]) / 3;
+    const cz = (pos[idx[t] * 3 + 2] + pos[idx[t + 1] * 3 + 2] + pos[idx[t + 2] * 3 + 2]) / 3;
+    const bi = Math.min(K - 1, Math.max(0, Math.floor((cx + lv.R) / size)));
+    const bj = Math.min(K - 1, Math.max(0, Math.floor((cz + lv.R) / size)));
+    buckets[bj * K + bi].push(idx[t], idx[t + 1], idx[t + 2]);
+  }
+  const out: THREE.BufferGeometry[] = [];
+  const box = new THREE.Box3();
+  for (const list of buckets) {
+    if (!list.length) continue;
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', posAttr);
+    geo.setAttribute('normal', norAttr);
+    geo.setIndex(new THREE.BufferAttribute(new Uint32Array(list), 1));
+    box.makeEmpty();
+    for (const k of list) box.expandByPoint(v.set(pos[k * 3], pos[k * 3 + 1], pos[k * 3 + 2]));
+    geo.boundingBox = box.clone();
+    geo.boundingSphere = box.getBoundingSphere(new THREE.Sphere());
+    out.push(geo);
+  }
+  return out;
 }
 
 function buildMask() {
@@ -234,11 +255,13 @@ export function buildTerrain() {
   U.uMask.value = buildMask();
   const mat = createTerrainMaterial();
   LEVELS.forEach((lv, i) => {
-    const mesh = new THREE.Mesh(buildLevel(lv), mat);
-    mesh.receiveShadow = true;
-    mesh.castShadow = i < 2;
-    mesh.name = `terrain-${i}`;
-    group.add(mesh);
+    buildLevel(lv).forEach((geo, k) => {
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.receiveShadow = true;
+      mesh.castShadow = i < 2;
+      mesh.name = `terrain-${i}-${k}`;
+      group.add(mesh);
+    });
   });
   return group;
 }
