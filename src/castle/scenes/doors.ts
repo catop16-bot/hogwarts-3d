@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { Builder } from '../kit';
+import { mat4, type Builder } from '../kit';
 import { heightAt, getPath, STAMPS } from '../../world/heightfield';
 import { samplePath } from '../grounds';
 import { PL } from '../../world/heightfield';
@@ -37,8 +37,29 @@ export function doorDecal(b: Builder, d: DoorEnd, w = 2.2, h = 3.4, push = 0.06)
 export function towerDoor(b: Builder, d: DoorEnd, w = 2, h = 3.2, depth = 2.4, tint?: Parameters<Builder['box']>[8]) {
   const nx = Math.sin(d.face);
   const nz = Math.cos(d.face);
-  b.box('stone', w + 1.2, 4.9, depth, d.pos[0] - (nx * depth) / 2, d.pos[1] - 0.5, d.pos[2] - (nz * depth) / 2, d.face, tint);
-  b.box('stone', w + 1.8, 0.4, depth - 0.1, d.pos[0] - (nx * depth) / 2, d.pos[1] + 4.4, d.pos[2] - (nz * depth) / 2, d.face, tint);
+  const tx = Math.cos(d.face);
+  const tz = -Math.sin(d.face);
+  const cx = d.pos[0] - (nx * depth) / 2;
+  const cz = d.pos[2] - (nz * depth) / 2;
+  const y = d.pos[1];
+  const W = w + 1.2;
+  // 門廊本體、基座與山牆屋頂（山牆朝外）
+  b.box('stone', W, 4.9, depth, cx, y - 0.5, cz, d.face, tint);
+  b.box('stone', W + 0.5, 0.9, depth + 0.25, cx + nx * 0.1, y - 0.5, cz + nz * 0.1, d.face, tint);
+  b.gable('roof', 'stone', depth + 0.5, W, 1.9, cx, y + 4.4, cz, d.face - Math.PI / 2, 0.3, undefined, tint);
+  // 兩側的小扶壁與尖飾
+  for (const s of [-1, 1]) {
+    const bx = d.pos[0] + tx * s * (W / 2 + 0.1) - nx * 0.25;
+    const bz = d.pos[2] + tz * s * (W / 2 + 0.1) - nz * 0.25;
+    b.box('stone', 0.55, 3.9, 0.9, bx, y - 0.5, bz, d.face, tint);
+    b.box('stone', 0.45, 1.2, 0.6, bx - nx * 0.12, y + 3.4, bz - nz * 0.12, d.face, tint);
+    b.pinnacle(bx - nx * 0.12, y + 4.6, bz - nz * 0.12, 0.5, tint);
+  }
+  // 門洞上方的尖拱線腳、門前的石階
+  for (const s of [-1, 1]) {
+    b.add('stone', new THREE.BoxGeometry(0.16, w * 0.75, 0.18), mat4(d.pos[0] + tx * s * w * 0.27 + nx * 0.05, y + h + 0.12, d.pos[2] + tz * s * w * 0.27 + nz * 0.05, d.face, 0, s * 0.82), tint);
+  }
+  b.box('stone', W + 0.4, 0.14, 1.0, d.pos[0] + nx * 0.5, y - 0.02, d.pos[2] + nz * 0.5, d.face, tint);
   doorDecal(b, d, w, h, 0.06);
 }
 

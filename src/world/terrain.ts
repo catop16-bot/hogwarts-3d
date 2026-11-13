@@ -175,14 +175,31 @@ export function createTerrainMaterial() {
         float forest = mask.r * inMask;
         vec3 grass = uGrass * (0.5 + 0.6 * n2) * (0.8 + 0.3 * n5) * (0.75 + 0.4 * n4);
         grass = mix(grass, grass * vec3(1.25, 1.05, 0.6), n1 * 0.45);
+        // 打破大片草地的均勻感：偏黃的乾草斑、深綠的苔蘚斑；城堡台地上再加淡淡的割草條紋
+        float dry = smoothstep(0.52, 0.78, noiseTex(p / 61.0 + 3.7).b);
+        float lush = smoothstep(0.55, 0.8, noiseTex(p / 43.0 + 9.1).a);
+        grass = mix(grass, grass * vec3(1.22, 1.1, 0.68), dry * 0.45);
+        grass = mix(grass, grass * vec3(0.72, 0.92, 0.7), lush * 0.4);
+        float lawn = smoothstep(69.3, 69.8, vWPos.y) * (1.0 - smoothstep(70.6, 71.4, vWPos.y)) * (1.0 - smoothstep(0.02, 0.08, slope));
+        grass *= 1.0 + lawn * 0.07 * sign(sin((p.x + p.y * 0.35) * 0.7));
         vec3 moor = mix(vec3(0.15, 0.115, 0.06), vec3(0.17, 0.10, 0.13), n1) * (0.7 + 0.6 * n3);
         float moorAmt = smoothstep(0.42, 0.66, n4 + n2 * 0.35) * smoothstep(55.0, 170.0, vWPos.y);
         vec3 col = mix(grass, moor, moorAmt * 0.75);
         col = mix(col, vec3(0.035, 0.04, 0.022) * (0.7 + 0.6 * n3), forest * 0.85);
         // 岩壁：水平的岩層紋理加上垂直裂隙
         float strata = noiseTex(vec2(vWPos.y / 11.0 + n2 * 0.6, (p.x + p.y) / 310.0)).r;
-        float fract1 = noiseTex(vec2((p.x - p.y) / 23.0, vWPos.y / 70.0)).g;
-        vec3 rock = mix(vec3(0.10, 0.098, 0.095), vec3(0.25, 0.235, 0.215), strata * 0.6 + n1 * 0.4) * (0.7 + 0.5 * n3);
+        // 陡坡上 xz 幾乎不變，雜訊會被拉成直條；改從側面（三向投影）取樣
+        vec3 aw = abs(N);
+        float wsum = aw.x + aw.z + 1e-4;
+        float steep = smoothstep(0.3, 0.65, slope);
+        float r3 = (noiseTex(vWPos.zy / 9.0).b * aw.x + noiseTex(vWPos.xy / 9.0).b * aw.z) / wsum;
+        float r1 = (noiseTex(vWPos.zy / 37.0).r * aw.x + noiseTex(vWPos.xy / 37.0).r * aw.z) / wsum;
+        float r5 = (noiseTex(vWPos.zy / 2.7).r * aw.x + noiseTex(vWPos.xy / 2.7).r * aw.z) / wsum;
+        float d1 = mix(n1, r1, steep);
+        float d3 = mix(n3, r3, steep);
+        float d5 = mix(n5, r5, steep);
+        float fract1 = noiseTex(vec2((p.x - p.y) / 23.0, vWPos.y / 34.0)).g;
+        vec3 rock = mix(vec3(0.10, 0.098, 0.095), vec3(0.25, 0.235, 0.215), strata * 0.6 + d1 * 0.4) * (0.7 + 0.5 * d3);
         rock *= 0.72 + 0.5 * fract1;
         float rockAmt = smoothstep(0.2, 0.4, slope + (n1 - 0.5) * 0.16);
         col = mix(col, rock, rockAmt);
@@ -197,7 +214,7 @@ export function createTerrainMaterial() {
         col = mix(col, vec3(0.80, 0.85, 0.93) * (0.8 + 0.14 * n5 + 0.16 * n2), gSnow);
         col *= 1.0 - 0.32 * uWet * (1.0 - gSnow);
         diffuseColor.rgb = col;
-        gBump = (n1 * 0.5 + n3 * 0.3 + n5 * 0.2) * mix(1.0, 2.2, rockAmt) * (1.0 - gSnow * 0.7);
+        gBump = (d1 * 0.5 + d3 * 0.3 + d5 * 0.2) * mix(1.0, 2.2, rockAmt) * (1.0 - gSnow * 0.7);
       }`,
     fragNormal: /* glsl */ `
       {

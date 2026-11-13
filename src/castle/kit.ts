@@ -22,6 +22,9 @@ export function mat4(x: number, y: number, z: number, ry = 0, rx = 0, rz = 0) {
 }
 
 export type WinType = 0 | 1 | 2 | 3 | 4 | 5;
+/** 牆面上要留空的位置（門）：壁柱等裝飾會避開 */
+export const KEEP_CLEAR: [number, number][] = [];
+const TRIM = new THREE.Color(1.12, 1.1, 1.05);
 /** 0 小窗、1 哥德式高窗（大廳）、2 鐘面、3 箭孔、4 木門、5 玫瑰窗 */
 
 export interface TowerOpts {
@@ -101,6 +104,11 @@ export class Builder {
   private parts = new Map<MatKey, THREE.BufferGeometry[]>();
   rng: () => number;
   tint: THREE.Color = WHITE;
+  /** 窗台、線腳等修飾石材的色調（略淺的琢石） */
+  trim: THREE.Color = TRIM;
+  private setTrim(tint?: THREE.Color) {
+    this.trim = tint ? tint.clone().multiplyScalar(1.04) : TRIM;
+  }
 
   constructor(seed = 1) {
     this.rng = makeRng(seed);
@@ -242,6 +250,14 @@ export class Builder {
     }
     g.setAttribute('aWin', new THREE.BufferAttribute(a, 3));
     const m = mat4(x + Math.sin(ry) * push, y + h / 2, z + Math.cos(ry) * push, ry);
+    // 一般的窗：石窗台與窗楣，讓牆面有一點凹凸
+    if ((type === 0 || type === 1) && w >= 0.9 && push >= 0.1) {
+      const d = push + 0.2;
+      const ox = Math.sin(ry) * (d / 2 - 0.04);
+      const oz = Math.cos(ry) * (d / 2 - 0.04);
+      this.box('stone', w + 0.36, 0.16, d, x + ox, y - 0.16, z + oz, ry, this.trim);
+      this.box('stone', w + 0.3, 0.13, d - 0.06, x + ox, y + h + 0.02, z + oz, ry, this.trim);
+    }
     return this.add('window', g, m);
   }
 
@@ -309,6 +325,7 @@ export class Builder {
   /** 圓塔：塔身、腰線、懸挑的塔頂迴廊、錐形屋頂 */
   roundTower(o: TowerOpts) {
     const y0 = o.y ?? 0;
+    this.setTrim(o.tint);
     const seg = o.seg ?? 20;
     const taper = o.taper ?? 0.05;
     const found = o.found ?? 16;
@@ -395,6 +412,7 @@ export class Builder {
 
   /** 方塔：四角可帶八角小塔，頂部為金字塔頂或城垛 */
   squareTower(o: SquareOpts) {
+    this.setTrim(o.tint);
     const y0 = o.y ?? 0;
     const ry = o.ry ?? 0;
     const found = o.found ?? 16;
@@ -456,6 +474,7 @@ export class Builder {
   /** 長形建築：牆身＋山牆屋頂＋成排窗戶，可加扶壁 */
   wing(o: WingOpts) {
     const y0 = o.y ?? 0;
+    this.setTrim(o.tint);
     const ry = o.ry ?? 0;
     const found = o.found ?? 14;
     const tint = o.tint;
@@ -468,6 +487,19 @@ export class Builder {
       this.box('stone', o.w + 0.7, 0.7, o.d + 0.7, o.x, y0 + o.h - 0.7, o.z, ry, tint);
     }
     const roofH = o.roofH ?? o.d * 0.62;
+    // 樓層之間的腰線
+    if (!o.noBody && o.h >= 14) {
+      const bands = Math.max(1, Math.round(o.h / 9) - 1);
+      for (let i = 1; i <= bands; i++) this.box('stone', o.w + 0.5, 0.32, o.d + 0.5, o.x, y0 + (o.h * i) / (bands + 1) + 0.6, o.z, ry, tint);
+    }
+    // 屋脊的石脊與兩端的尖飾
+    if (roofH > 0 && !o.crenel) {
+      this.box('stone', o.w + 1.3, 0.34, 0.5, o.x, y0 + o.h + roofH - 0.12, o.z, ry, tint);
+      if (o.h >= 15) for (const sx of [1, -1]) {
+        const [px, pz] = W(sx * (o.w / 2 + 0.55), 0);
+        this.pinnacle(px, y0 + o.h + roofH + 0.1, pz, 0.8, tint);
+      }
+    }
     if (o.crenel) this.crenelRect(o.w + 0.7, o.d + 0.7, o.x, y0 + o.h, o.z, ry, tint);
     if (roofH > 0) this.gable('roof', 'stone', o.crenel ? o.w - 2 : o.w, o.crenel ? o.d - 2.4 : o.d, roofH, o.x, y0 + o.h, o.z, ry, o.crenel ? 0 : 0.7, undefined, tint);
     // 兩側的窗
@@ -493,6 +525,20 @@ export class Builder {
         this.windowRow(len, count, ww, wh, cx, y, cz, a, o.winType ?? 0, skip);
       }
     }
+    // 長廂房沒有扶壁時：窗與窗之間加淺壁柱，避開門的位置
+    if (!o.buttress && o.w >= 40 && o.h >= 18) {
+      for (let i = 0; i <= count; i++) {
+        const lx = (i - count / 2) * spacing;
+        if (Math.abs(lx) > o.w / 2 - 0.8) continue;
+        for (const sz of [1, -1]) {
+          if (!sides[sz === 1 ? 0 : 1]) continue;
+          const [bx, bz] = W(lx, sz * (o.d / 2 + 0.22));
+          if (KEEP_CLEAR.some(([kx, kz]) => Math.hypot(kx - bx, kz - bz) < 2.6)) continue;
+          this.box('stone', 0.95, o.h - 0.9, 0.5, bx, y0, bz, ry, tint);
+          this.box('stone', 1.25, 1.6, 0.75, bx, y0 - 0.4, bz, ry, tint);
+        }
+      }
+    }
     // 扶壁與小尖塔
     if (o.buttress) {
       for (let i = 0; i <= count; i++) {
@@ -516,7 +562,8 @@ export class Builder {
         this.window(gw, gh, gx, y0 + o.h * 0.22, gz, ry + (sx * Math.PI) / 2, gt);
       }
     }
-    for (let i = 0; i < (o.chimneys ?? 0); i++) {
+    const chimneys = o.chimneys ?? (o.w >= 40 && o.h >= 15 ? Math.round(o.w / 26) : 0);
+    for (let i = 0; i < chimneys; i++) {
       const lx = (this.rng() - 0.5) * o.w * 0.8;
       const lz = (this.rng() - 0.5) * o.d * 0.4;
       const [cx, cz] = W(lx, lz);

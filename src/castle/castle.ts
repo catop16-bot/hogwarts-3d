@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Builder, col, mat4 } from './kit';
+import { Builder, col, mat4, KEEP_CLEAR } from './kit';
 import { getMaterials } from './materials';
 import { PL, heightAt } from '../world/heightfield';
 import { greatHallInterior, entranceInterior, staircaseInterior, GH } from './interiors';
@@ -42,6 +42,26 @@ function curtain(b: Builder, x0: number, z0: number, x1: number, z1: number, h =
   }
 }
 
+/** 拱廊牆：把兩棟建築連起來，底下的尖拱可以走過去 */
+function arcade(b: Builder, x0: number, z0: number, x1: number, z1: number, h = 7.5, tint?: THREE.Color) {
+  const len = Math.hypot(x1 - x0, z1 - z0);
+  const spans = Math.max(2, Math.round(len / 6.5));
+  const spring = Y + 2.9;
+  const { span, ry } = b.archWall('stone', V(x0, 0, z0), V(x1, 0, z1), Y + h, spring, spans, 1.5, 1.9, 0.4, tint);
+  const ux = (x1 - x0) / len;
+  const uz = (z1 - z0) / len;
+  for (let i = 0; i <= spans; i++) {
+    const px = x0 + ux * span * i;
+    const pz = z0 + uz * span * i;
+    b.box('stone', 1.5, spring - Y + 6, 1.9, px, Y - 6, pz, ry, tint);
+    b.box('stone', 1.9, 0.5, 2.3, px, Y - 0.1, pz, ry, tint);
+  }
+  const cx = (x0 + x1) / 2;
+  const cz = (z0 + z1) / 2;
+  b.box('stone', len + 1.5, 0.4, 2.4, cx, Y + h - 0.4, cz, ry, tint);
+  b.crenelRect(len + 1.5, 2.4, cx, Y + h, cz, ry, tint, 1.1, 1.0);
+}
+
 /** 噴泉 */
 function fountain(b: Builder, x: number, z: number, s = 1) {
   b.cyl('stone', 4.2 * s, 4.4 * s, 0.9, x, Y, z, 12, PAVE);
@@ -58,6 +78,16 @@ function cloister(b: Builder, x0: number, z0: number, x1: number, z1: number, de
   const spans = Math.max(2, Math.round(len / 5.2));
   b.archWall('stone', V(x0, 0, z0), V(x1, 0, z1), Y + h, Y + 2.6, spans, 0.9, 0.9, 0.45, WARM);
   const ry = Math.atan2(-(z1 - z0), x1 - x0);
+  // 拱只從起拱點往上砌，底下要有落地的柱身，不然柱子會懸在半空
+  for (let i = 0; i <= spans; i++) {
+    const t = i / spans;
+    const px = x0 + (x1 - x0) * t;
+    const pz = z0 + (z1 - z0) * t;
+    if (gap != null && Math.abs(t * len - gap) < 1.7) continue;
+    b.box('stone', 0.9, 2.7, 0.9, px, Y, pz, ry, WARM);
+    b.box('stone', 1.15, 0.22, 1.15, px, Y + 2.45, pz, ry, WARM);
+    b.box('stone', 1.2, 0.35, 1.2, px, Y, pz, ry, WARM);
+  }
   const cx = (x0 + x1) / 2;
   const cz = (z0 + z1) / 2;
   // 拱下的矮牆
@@ -85,6 +115,9 @@ function cloister(b: Builder, x0: number, z0: number, x1: number, z1: number, de
 }
 
 export function buildCastle(): Built[] {
+  KEEP_CLEAR.length = 0;
+  for (const d of [...Object.values(DOORS), ...Object.values(TD), ...Object.values(WING_DOORS), ...Object.values(SMALL_TOWER_DOORS), ...LOOKOUT_DOORS]) KEEP_CLEAR.push([d.pos[0], d.pos[2]]);
+  KEEP_CLEAR.push([CORR.x0, CORR.door], [CORR.x1, CORR.door], [GH.door, GH.z0], [162, 30], [-95, 78], [-65, 78], [-65, 66]);
   const M = getMaterials();
   const out: Built[] = [];
   const done = (id: string, b: Builder) => out.push({ id, group: b.build(id, M) });
@@ -371,6 +404,7 @@ export function buildCastle(): Built[] {
     curtain(b, 206, -74, 206, -56, 8, 2.6, WARM);
     curtain(b, 206, -40, 206, -22, 8, 2.6, WARM);
     b.archWall('stone', V(206, 0, -54), V(206, 0, -42), Y + 10, Y + 4.5, 1, 3, 3.4, 0.45, WARM);
+    for (const z of [-54, -42]) b.box('stone', 3.4, 4.6, 3, 206, Y, z, 0, WARM);
     fountain(b, cx - 2, cz, 0.85);
     // 庭院裡的幾塊立石與長凳
     for (let i = 0; i < 4; i++) b.box('stone', 2.4, 0.5, 0.8, cx - 10 + i * 6.5, Y, cz + 12, 0, PAVE);
@@ -555,8 +589,18 @@ export function buildCastle(): Built[] {
     curtain(b, 76, 124, 112, 118, 13, 3.4);
     curtain(b, 140, 106, 170, 76, 12, 3.4);
     curtain(b, 172, 70, 180, -18, 11, 3.2);
-    curtain(b, 70, -122, 150, -62, 11, 3.2);
-    curtain(b, 44, -132, 52, -132, 11, 3.2);
+    // 這段城牆中途被東北廂房穿過：分成兩段，各自接到廂房的牆面
+    curtain(b, 70, -122, 110, -92, 11, 3.2);
+    curtain(b, 121, -83.8, 150, -62, 11, 3.2);
+    curtain(b, 40, -115, 56, -126, 11, 3.2);
+    // 補上原本斷開的幾段：西牆接雷文克勞塔、西北角接天文塔、北門接北塔
+    curtain(b, -171, -47, -168, -100, 12, 3.4);
+    curtain(b, -134, -128, -127, -108, 12, 3.4);
+    curtain(b, 60.5, -147, 62, -136, 11, 3.2);
+    // 把零散的廂房與塔串起來的拱廊牆（拱下可以通行）
+    arcade(b, -36, -62.5, -36, -95.5);
+    arcade(b, 20, -80.5, 20, -95.5);
+    arcade(b, 76.5, -16, 75.5, -40, 7.5, COOL);
     b.roundTower({ x: 20, z: 122, y: Y, r: 5.5, h: 26, roofH: 11, rows: 2, per: 3 });
     b.roundTower({ x: 76, z: 124, y: Y, r: 5, h: 22, roofH: 0, top: 'crenel', rows: 2, per: 3 });
     b.roundTower({ x: 172, z: 73, y: Y, r: 5, h: 24, roofH: 10, rows: 2, per: 3 });

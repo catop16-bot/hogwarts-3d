@@ -24,6 +24,7 @@ import { buildCampusPockets } from './castle/scenes/campus';
 import { buildTowerPockets } from './castle/scenes/towers';
 import { buildWingPockets } from './castle/scenes/wings';
 import { Grass } from './world/grass';
+import { buildDressing } from './castle/dressing';
 import { SceneManager } from './castle/scenes/manager';
 import { SCENES, PORTALS } from './castle/scenes/registry';
 import { CollisionWorld } from './player/collision';
@@ -98,7 +99,13 @@ async function boot() {
 
   lap('grounds');
   await step(70, '栽下禁忌森林…');
-  const forest = buildForest(quality.trees);
+  // 碰撞世界先建好：校園佈置要靠它避開建築
+  const world = new CollisionWorld();
+  [...castle, ...grounds.built].forEach((b) => world.add(b.group));
+  const dressing = buildDressing(world);
+  scene.add(dressing.group);
+  world.add(dressing.group);
+  const forest = buildForest(quality.trees, dressing.trees);
   scene.add(forest);
   const willow = buildWillow(STAMPS.willow.x, STAMPS.willow.z);
   scene.add(willow);
@@ -115,8 +122,6 @@ async function boot() {
   landmarks.register('willow', willow);
 
   // 第三人稱漫遊：碰撞直接使用建築的網格
-  const world = new CollisionWorld();
-  [...castle, ...grounds.built].forEach((b) => world.add(b.group));
   world.add(scenes.group);
   scenes.onBuilt = (g) => world.add(g);
   const grass = new Grass(world);

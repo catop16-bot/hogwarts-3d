@@ -157,7 +157,7 @@ interface Bucket {
   c: THREE.Color[];
 }
 
-export function buildForest(density: number) {
+export function buildForest(density: number, campus: [number, number, number, boolean][] = []) {
   const group = new THREE.Group();
   group.name = 'forest';
   const rng = makeRng(4242);
@@ -222,6 +222,8 @@ export function buildForest(density: number) {
     [-420, 120, 12], [-480, 20, 14], [-500, 110, 12], [-430, -40, 11], [300, -420, 14], [240, -520, 15], [420, -560, 12],
   ];
   for (const [x, z, h] of lawn) place(x, z, 'broad', h, 1.5, new THREE.Color(1, 1, 1));
+  // 城堡台地上的樹（位置由校園佈置算好，已避開建築與步道）
+  for (const [x, z, h, pine] of campus) place(x, z, pine ? 'pine' : 'broad', h, pine ? 0.9 : 1.35, new THREE.Color(1, 1, 1));
   // 湖岸與海格小屋後方的森林邊緣
   void STAMPS;
 
