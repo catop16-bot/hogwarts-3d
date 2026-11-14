@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "blender": {
+      "command": "/Users/cooper6716/.local/bin/uvx",
+      "args": ["blender-mcp"],
+      "env": { "DISABLE_TELEMETRY": "true" }
+    }
+  }
+}

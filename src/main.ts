@@ -28,6 +28,7 @@ import { buildDressing } from './castle/dressing';
 import { SceneManager } from './castle/scenes/manager';
 import { SCENES, PORTALS } from './castle/scenes/registry';
 import { CollisionWorld } from './player/collision';
+import { preloadCharacter } from './player/character';
 import { Player } from './player/player';
 
 const canvas = document.getElementById('scene') as HTMLCanvasElement;
@@ -65,6 +66,8 @@ async function boot() {
 
   const T0 = performance.now();
   const lap = (n: string) => console.info(`[載入] ${n} ${(performance.now() - T0).toFixed(0)}ms`);
+  // 角色模型與世界的建造同時下載
+  const characterReady = preloadCharacter();
   await step(6, '塑造蘇格蘭高地的山巒…');
   const terrain = buildTerrain();
   scene.add(terrain);
@@ -127,6 +130,7 @@ async function boot() {
   scenes.onBuilt = (g) => world.add(g);
   const grass = new Grass(world);
   scene.add(grass.mesh);
+  await characterReady;
   const player = new Player(camera, canvas, world, rig);
   scene.add(player.character.root);
 

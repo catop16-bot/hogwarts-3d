@@ -2,7 +2,7 @@
 
 在瀏覽器裡以 3D 方式觀覽霍格沃茲城堡與周邊的開放世界：黑湖、禁忌森林、魁地奇球場、活米村……
 也可以化身成一名學生，以第三人稱走進入口大廳、大廳與大樓梯塔，或騎著掃帚飛進魁地奇球場。
-整體配置以電影後期版（《阿茲卡班的逃犯》到《死神的聖物》）為準，所有模型、材質、天空與天氣都由程式即時生成，沒有使用任何外部美術素材。
+整體配置以電影後期版（《阿茲卡班的逃犯》到《死神的聖物》）為準，場景的模型、材質、天空與天氣都由程式即時生成；玩家角色由 Blender 腳本（`tools/blender/student.py`）生成網格、骨架與動畫。沒有使用任何外部美術素材。
 
 > 非官方的同人作品，與 Warner Bros.、J.K. Rowling 無關。
 
@@ -130,9 +130,19 @@ src/
   environment/  時間、天空、天氣、光照
   fx/           後製特效、會動的事件（火車、小船…）
   camera/       軌道／飛行／導覽鏡頭
-  player/       第三人稱角色：程序化人物模型、碰撞、跟隨鏡頭
+  player/       第三人稱角色：Blender 模型與動畫混合（載入失敗時退回程序化人物）、碰撞、跟隨鏡頭
   ui/           介面
 ```
+
+## 角色模型（Blender）
+
+角色的網格、骨架與動畫片段（待機、走、跑、起跳、下墜、落地、騎掃帚、游泳、路摸思）都寫在 `tools/blender/student.py`，修改後重新產生：
+
+```bash
+/Applications/Blender.app/Contents/MacOS/Blender -b --factory-startup -P tools/blender/student.py -- --out public/models/student.glb --preview /tmp/student
+```
+
+`--preview` 會另外算繪四向造型圖與動作對照圖。專案的 `.mcp.json` 也設定了「MCP for Blender」，可以讓 Claude 直接操作開著的 Blender。
 
 ## 後續規劃
 

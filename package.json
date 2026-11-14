@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "霍格沃茲 3D 開放世界觀覽（非官方同人作品，全部以程式生成）",
+  "description": "霍格沃茲 3D 開放世界觀覽（非官方同人作品，場景以程式生成、角色以 Blender 腳本生成）",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

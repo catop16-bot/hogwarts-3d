@@ -179,6 +179,9 @@ export function buildCastle(): Built[] {
     b.box('stone', 76, 9, 1.2, -134, Y, 46.2, 0, WARM);
     curtain(b, -174, 46, -174, 62, 10, 3, WARM);
     curtain(b, -174, 82, -174, 99, 10, 3, WARM);
+    // 補牆：庭院南側從西牆端接到大廳西北角的小塔（避開閣樓的門）、東北角從迴廊尾端接到入口大廳
+    curtain(b, -175.5, 99, -143.5, 99, 10, 3, WARM);
+    curtain(b, -96.5, 45, -96.5, 58.5, 10, 3, WARM);
     // 門樓：兩座小塔夾著拱門
     for (const dz of [-8.5, 8.5]) {
       b.roundTower({ x: -174, z: 72 + dz, y: Y, r: 4.2, h: 20, roofH: 9, seg: 12, rows: 2, per: 3, tint: WARM, top: 'corbel' });
