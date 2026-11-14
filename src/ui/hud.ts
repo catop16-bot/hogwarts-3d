@@ -8,12 +8,14 @@ import { QUALITY, type QualityName } from '../core/quality';
 import type { Player } from '../player/player';
 import { HOUSES } from '../player/character';
 import type { SceneManager } from '../castle/scenes/manager';
+import type { NpcManager, Npc } from '../npc/manager';
 import * as THREE from 'three';
 import { SCENES, PORTALS, type PortalDef } from '../castle/scenes/registry';
 import { MapView } from './map';
 
 const $ = <T extends HTMLElement>(sel: string, root: ParentNode = document) => root.querySelector(sel) as T;
 const SPEED_LABELS = ['⏸', '1×', '1 分/秒', '10 分/秒', '1 時/秒'];
+const PEOPLE_TABS: [string, string][] = [['all', '全部'], ['staff', '教職員'], ['student', '學生'], ['ghost', '幽靈'], ['other', '小精靈與動物']];
 const EVENT_WEATHER: Record<string, WeatherKind> = { term: 'partly', boats: 'clear', halloween: 'partly', quidditch: 'partly', christmas: 'snow', spring: 'mist', summer: 'clear', aurora: 'clear' };
 const EVENT_FOCUS: Record<string, string> = { term: 'railViaduct', boats: 'viaduct', halloween: 'greatHall', quidditch: 'quidditch', christmas: 'viaductCourtyard', spring: 'owlery', summer: 'lake', aurora: 'astronomy' };
 
@@ -23,6 +25,7 @@ export interface HudDeps {
   landmarks: LandmarkSystem;
   player: Player;
   scenes: SceneManager;
+  npcs: NpcManager;
   getQuality: () => QualityName;
   setQuality: (q: QualityName) => void;
   getStats: () => { fps: number; calls: number; tris: number };
@@ -76,6 +79,7 @@ export class Hud {
       <button class="tool" id="btn-walk" title="化身學生，在校園裡漫遊 (G)">🚶 <span class="tl">漫遊</span></button>
       <button class="tool" id="btn-fly" title="自由飛行 (F)">✈ <span class="tl">飛行</span></button>
       <button class="tool" id="btn-tour" title="電影運鏡導覽 (T)">▶ <span class="tl">導覽</span></button>
+      <button class="tool" id="btn-people" title="人物：誰在哪裡，點一下前往 (P)">👥 <span class="tl">人物</span></button>
       <button class="tool" id="btn-events" title="校曆上的特別時刻">✦ <span class="tl">事件</span></button>
       <button class="tool" id="btn-settings" title="畫質設定">⚙</button>
       <button class="tool" id="btn-hide" title="隱藏介面 (H)">⤢</button>
@@ -86,6 +90,12 @@ export class Hud {
     </aside>
     <aside class="panel right hidden" id="card"></aside>
     <div class="panel pop hidden" id="events"><h3>校曆上的特別時刻</h3>${events}</div>
+    <div class="panel pop hidden" id="people">
+      <h3>人物</h3>
+      <div class="row" id="people-tabs">${PEOPLE_TABS.map(([k, n], i) => `<button class="chip${i ? '' : ' on'}" data-pk="${k}">${n}</button>`).join('')}</div>
+      <p class="note">此刻在哪裡、在做什麼；點一下就前往那裡。</p>
+      <div id="people-list"></div>
+    </div>
     <div class="panel pop hidden" id="settings">
       <h3>畫質</h3><div class="row">${quality}</div>
       <p class="note">「中」適合一般筆電；「高」會以原生解析度繪製並開啟完整的環境光遮蔽。</p>
@@ -120,6 +130,7 @@ export class Hud {
       </div>
     </div>
     <div class="prompt hidden" id="prompt"></div>
+    <div class="talk hidden" id="talk"><div class="talk-who"><b></b><span></span></div><p></p></div>
     <div class="nearby hidden" id="nearby"><i>▲</i><span></span></div>
     <div id="fade"></div>
     <div id="labels"></div>
@@ -214,8 +225,29 @@ export class Hud {
     this.refreshWalk();
     $('#btn-fly').onclick = () => rig.setMode(rig.mode === 'fly' ? 'orbit' : 'fly');
     $('#btn-tour').onclick = () => rig.setMode(rig.mode === 'tour' ? 'orbit' : 'tour');
-    $('#btn-events').onclick = () => toggle('#events', ['#settings']);
-    $('#btn-settings').onclick = () => toggle('#settings', ['#events']);
+    $('#btn-events').onclick = () => toggle('#events', ['#settings', '#people']);
+    $('#btn-settings').onclick = () => toggle('#settings', ['#events', '#people']);
+    $('#btn-people').onclick = () => {
+      toggle('#people', ['#events', '#settings']);
+      this.refreshPeople();
+    };
+    $('#people-tabs').onclick = (e) => {
+      const b = (e.target as HTMLElement).closest<HTMLElement>('[data-pk]');
+      if (!b) return;
+      this.peopleKind = b.dataset.pk!;
+      $('#people-tabs').querySelectorAll('.chip').forEach((c) => c.classList.toggle('on', c === b));
+      this.refreshPeople();
+    };
+    $('#people-list').onclick = (e) => {
+      const b = (e.target as HTMLElement).closest<HTMLElement>('[data-npc]');
+      const n = b && this.d.npcs.npcs.find((o) => o.def.id === b.dataset.npc);
+      if (!n) return;
+      const r = this.d.npcs.locate(n);
+      if (!r.to) return this.toast(`${n.def.name}現在${r.where}`, 3000);
+      $('#people').classList.add('hidden');
+      this.travel(r.to);
+      this.toast(`前往${r.where}找${n.def.name}`, 3500);
+    };
     $('#btn-hide').onclick = () => this.toggleUi();
     rig.onModeChange = (m) => this.setMode(m);
 
@@ -279,9 +311,11 @@ export class Hud {
       else if (e.code === 'KeyF' && rig.mode === 'walk') this.broom();
       else if (e.code === 'KeyQ' && rig.mode === 'walk') player.toggleLumos();
       else if (e.code === 'KeyM') this.map.toggle();
+      else if (e.code === 'KeyP') $('#btn-people').click();
       else if (e.code === 'Escape' && this.map.open) this.map.toggle(false);
       else if (e.code === 'KeyE' && rig.mode === 'walk') {
-        if (this.portal) this.travel(this.portal.to);
+        if (this.npc) this.talkTo(this.npc);
+        else if (this.portal) this.travel(this.portal.to);
       }
       else if (e.code === 'KeyF') rig.setMode(rig.mode === 'fly' ? 'orbit' : 'fly');
       else if (e.code === 'KeyT') rig.setMode(rig.mode === 'tour' ? 'orbit' : 'tour');
@@ -293,6 +327,7 @@ export class Hud {
         landmarks.select(null);
         $('#events').classList.add('hidden');
         $('#settings').classList.add('hidden');
+        $('#people').classList.add('hidden');
       }
     });
   }
@@ -321,7 +356,46 @@ export class Hud {
   }
 
   private portal: PortalDef | null = null;
+  private peopleKind = 'all';
+  private peopleT = 0;
+
+  /** 人物清單：依類別列出具名角色此刻的去處 */
+  private refreshPeople() {
+    const el = $('#people');
+    if (el.classList.contains('hidden')) return;
+    const kinds: Record<string, string[]> = { all: ['staff', 'student', 'ghost', 'elf', 'animal'], staff: ['staff'], student: ['student'], ghost: ['ghost'], other: ['elf', 'animal'] };
+    const want = kinds[this.peopleKind] ?? kinds.all;
+    const rows = this.d.npcs.npcs
+      .filter((n) => !n.def.crowd && want.includes(n.def.kind))
+      .map((n) => {
+        const r = this.d.npcs.locate(n);
+        const doing = n.slot?.doing ?? '不在城堡裡';
+        return `<button class="event${r.to ? '' : ' off'}" data-npc="${n.def.id}"><b>${n.def.name}</b><span>${n.def.title}<br/>${doing}${r.to && !doing.includes(r.where) ? `（${r.where}）` : ''}</span></button>`;
+      });
+    $('#people-list').innerHTML = rows.join('');
+  }
+  private npc: Npc | null = null;
+  private talking: Npc | null = null;
+  private talkTimer = 0;
   private traveling = false;
+
+  /** 跟 NPC 說話：畫面下方顯示名字、定位與一句話 */
+  private talkTo(n: Npc) {
+    const r = this.d.npcs.talk(n, this.d.player.house);
+    const el = $('#talk');
+    el.querySelector('b')!.textContent = r.name;
+    el.querySelector('span')!.textContent = r.title;
+    el.querySelector('p')!.textContent = r.line;
+    el.classList.remove('hidden');
+    this.talking = n;
+    clearTimeout(this.talkTimer);
+    this.talkTimer = window.setTimeout(() => this.endTalk(), 6500);
+  }
+
+  private endTalk() {
+    this.talking = null;
+    $('#talk').classList.add('hidden');
+  }
 
   private broom() {
     if (!this.d.player.toggleBroom()) this.toast('室內太窄了，沒辦法騎掃帚', 2500);
@@ -439,15 +513,29 @@ export class Hud {
     }
     // 走到門前的互動提示
     const walking = this.d.rig.mode === 'walk';
-    const portal = walking && !this.traveling ? this.d.scenes.nearestPortal(this.d.player.pos) : null;
-    if (portal !== this.portal) {
-      this.portal = portal;
-      const el = $('#prompt');
-      el.classList.toggle('hidden', !portal);
-      if (portal) el.innerHTML = `<kbd>E</kbd> 前往 <b>${portal.label}</b>`;
+    const pp = this.d.player.pos;
+    let portal = walking && !this.traveling ? this.d.scenes.nearestPortal(pp) : null;
+    // 門和人都在附近時，取比較近的那個
+    let npc = walking && !this.traveling ? this.d.npcs.nearest(pp) : null;
+    if (npc && portal) {
+      if (this.d.npcs.distanceTo(npc, pp) < Math.hypot(portal.pos[0] - pp.x, portal.pos[2] - pp.z)) portal = null;
+      else npc = null;
     }
+    if (portal !== this.portal || npc !== this.npc) {
+      this.portal = portal;
+      this.npc = npc;
+      const el = $('#prompt');
+      el.classList.toggle('hidden', !portal && !npc);
+      if (npc) el.innerHTML = `<kbd>E</kbd> 和 <b>${npc.def.name}</b> 說話`;
+      else if (portal) el.innerHTML = `<kbd>E</kbd> 前往 <b>${portal.label}</b>`;
+    }
+    if (this.talking && (!walking || this.d.npcs.distanceTo(this.talking, pp) > 4.5 || !this.talking.shown)) this.endTalk();
     this.map.update();
-    this.updateNearby(walking && !portal);
+    if (performance.now() - this.peopleT > 2000) {
+      this.peopleT = performance.now();
+      this.refreshPeople();
+    }
+    this.updateNearby(walking && !portal && !npc);
     const act = this.d.getActive().filter((a) => a !== '聖誕佈置').join('、');
     if (act && act !== this.lastActive) this.toast(`✦ ${act}`, 5000);
     this.lastActive = act;

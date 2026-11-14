@@ -6,6 +6,25 @@ import { getPath, WATER, type BuiltPath } from '../world/heightfield';
 import { U, makeRng, smoothstep } from '../core/globals';
 import { dayOfYearFrom } from '../environment/timeSystem';
 import type { Environment } from '../environment/environment';
+import { MATCHES } from '../npc/schedule';
+
+/** 由 NPC 飛的球員編號：這些位置的方塊球員不畫 */
+export const QUIDDITCH_NPC = new Set<number>();
+const TEAM_COLORS = [new THREE.Color(0.5, 0.03, 0.03), new THREE.Color(0.7, 0.5, 0.04), new THREE.Color(0.035, 0.08, 0.36), new THREE.Color(0.03, 0.25, 0.08)];
+
+/** 第 i 位球員（0–6 一隊、7–13 另一隊）在時間 t 的位置與航向；NPC 球員也照這條路線飛 */
+export function quidditchFlight(i: number, t: number, c: THREE.Vector3, out: THREE.Vector3) {
+  const sp = 0.25 + (i % 5) * 0.045;
+  const ph = i * 2.1;
+  out.set(
+    c.x + Math.sin(t * sp + ph) * (40 + (i % 3) * 14),
+    c.y + 12 + (i % 4) * 4 + Math.sin(t * sp * 2.3 + ph) * 5,
+    c.z + Math.sin(t * sp * 1.7 + ph * 1.3) * (18 + (i % 4) * 3),
+  );
+  const dx = Math.cos(t * sp + ph) * sp * 45;
+  const dz = Math.cos(t * sp * 1.7 + ph * 1.3) * sp * 1.7 * 20;
+  return Math.atan2(dx, dz);
+}
 
 const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 
@@ -441,26 +460,23 @@ export class WorldEvents {
     }
 
     // ---- 魁地奇比賽日
-    const matchDays = [dayOfYearFrom(11, 9), dayOfYearFrom(2, 22), dayOfYearFrom(5, 24)];
-    const match = matchDays.includes(day) && hour > 10.5 && hour < 13.5;
+    const mt = MATCHES.find((mm) => dayOfYearFrom(mm.month, mm.day) === day);
+    const match = !!mt && hour > 10.5 && hour < 13.5;
     this.players.visible = match;
     this.snitch.visible = match;
     if (match) {
       active.push('魁地奇比賽進行中');
       const c = this.h.pitchCenter;
       for (let i = 0; i < 14; i++) {
-        const sp = 0.25 + (i % 5) * 0.045;
-        const ph = i * 2.1;
-        const x = c.x + Math.sin(t * sp + ph) * (40 + (i % 3) * 14);
-        const z = c.z + Math.sin(t * sp * 1.7 + ph * 1.3) * (18 + (i % 4) * 3);
-        const y = c.y + 12 + (i % 4) * 4 + Math.sin(t * sp * 2.3 + ph) * 5;
-        const dx = Math.cos(t * sp + ph) * sp * 45;
-        const dz = Math.cos(t * sp * 1.7 + ph * 1.3) * sp * 1.7 * 20;
-        q.setFromAxisAngle(THREE.Object3D.DEFAULT_UP, Math.atan2(dx, dz));
-        m.compose(p.set(x, y, z), q, new THREE.Vector3(1, 1, 1));
+        const yaw = quidditchFlight(i, t, c, p);
+        q.setFromAxisAngle(THREE.Object3D.DEFAULT_UP, yaw);
+        const k = QUIDDITCH_NPC.has(i) ? 0 : 1;
+        m.compose(p, q, new THREE.Vector3(k, k, k));
         this.players.setMatrixAt(i, m);
+        this.players.setColorAt(i, TEAM_COLORS[mt.teams[i < 7 ? 0 : 1]]);
       }
       this.players.instanceMatrix.needsUpdate = true;
+      if (this.players.instanceColor) this.players.instanceColor.needsUpdate = true;
       this.snitch.position.set(c.x + Math.sin(t * 1.9) * 50, c.y + 16 + Math.sin(t * 3.1) * 9, c.z + Math.cos(t * 2.6) * 22);
     }
     void camera;

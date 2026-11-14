@@ -2,7 +2,7 @@
 
 在瀏覽器裡以 3D 方式觀覽霍格沃茲城堡與周邊的開放世界：黑湖、禁忌森林、魁地奇球場、活米村……
 也可以化身成一名學生，以第三人稱走進入口大廳、大廳與大樓梯塔，或騎著掃帚飛進魁地奇球場。
-整體配置以電影後期版（《阿茲卡班的逃犯》到《死神的聖物》）為準，場景的模型、材質、天空與天氣都由程式即時生成；玩家角色由 Blender 腳本（`tools/blender/student.py`）生成網格、骨架與動畫。沒有使用任何外部美術素材。
+整體配置以電影後期版（《阿茲卡班的逃犯》到《死神的聖物》）為準，場景的模型、材質、天空與天氣都由程式即時生成；玩家與 NPC 角色由 Blender 腳本（`tools/blender/`）依參數生成網格、骨架與動畫。沒有使用任何外部美術素材。
 
 > 非官方的同人作品，與 Warner Bros.、J.K. Rowling 無關。
 
@@ -131,18 +131,45 @@ src/
   fx/           後製特效、會動的事件（火車、小船…）
   camera/       軌道／飛行／導覽鏡頭
   player/       第三人稱角色：Blender 模型與動畫混合（載入失敗時退回程序化人物）、碰撞、跟隨鏡頭
+  npc/          NPC：名冊與對白 (roster)、作息與課表 (schedule)、戶外地點 (places)、模型 (model)、出現與走動 (manager)
   ui/           介面
 ```
 
 ## 角色模型（Blender）
 
-角色的網格、骨架與動畫片段（待機、走、跑、起跳、下墜、落地、騎掃帚、游泳、路摸思）都寫在 `tools/blender/student.py`，修改後重新產生：
+`tools/blender/` 是參數化的角色生成器：`body.py` 依 `specs.py` 的參數（身高、體型、膚色、髮型、鬍子、眼鏡、帽子、服裝、配件）產生網格，`rig.py` 是所有人共用的骨架與動畫片段，`build.py` 是入口。修改後重新產生：
 
 ```bash
-/Applications/Blender.app/Contents/MacOS/Blender -b --factory-startup -P tools/blender/student.py -- --out public/models/student.glb --preview /tmp/student
+B=/Applications/Blender.app/Contents/MacOS/Blender
+# 玩家（含掃帚與待機、走、跑、起跳、下墜、落地、騎掃帚、游泳、路摸思）
+$B -b --factory-startup -P tools/blender/build.py -- --player --out public/models/student.glb --preview /tmp/player
+# NPC：每人一個減面後的模型；batch1、batch2、batch3、all 或逗號分隔的名字
+# 路人學生（每學院 6 種外觀）減面更多：--npc crowd --ratio 0.3
+$B -b --factory-startup -P tools/blender/build.py -- --npc batch1 --outdir public/models/npc --preview /tmp/npc
+# NPC 共用的動畫片段（坐、聊天、講課、揮手、施咒、攪拌、閱讀、睡覺、飄浮、抱胸、背手…）
+$B -b --factory-startup -P tools/blender/build.py -- --anims public/models/npc/anims.glb --preview /tmp/anims
+# 動物與奇獸（各自的骨架與動作，定義在 tools/blender/animals.py）
+$B -b --factory-startup -P tools/blender/build.py -- --animals all --outdir public/models/npc --preview /tmp/animals
 ```
 
-`--preview` 會另外算繪四向造型圖與動作對照圖。專案的 `.mcp.json` 也設定了「MCP for Blender」，可以讓 Claude 直接操作開著的 Blender。
+`--preview` 會另外算繪造型圖與動作對照圖。專案的 `.mcp.json` 也設定了「MCP for Blender」，可以讓 Claude 直接操作開著的 Blender。
+
+## NPC
+
+目前有 68 位具名角色與 48 位路人學生（`src/npc/roster.ts`、`staff.ts`、`students.ts`、`creatures.ts`、`crowd.ts`），依遊戲裡的時間換地點：
+
+- 三餐在大廳（教職員坐教師席、學生坐學院長桌），上課照四個學院的課表進教室（`src/npc/schedule.ts`），晚上回交誼廳；麥教授、石內卜、飛七與派西會巡夜。
+- 選修課（算命學、古代魔文、麻瓜研究）、星期三深夜的天文學、星期五晚上的決鬥社與鼻涕蟲社聚會。
+- 各隊在固定日子練魁地奇；比賽日（11/9、2/22、5/24）球員騎掃帚上場，其他人上看台加油。
+- 隔週星期六可以去活米村；滿月前後路平不在，課由石內卜代。
+- 寒暑假大部分學生回家；開學、萬聖節、聖誕節另有安排。
+- 學院幽靈（半透明、飄著走）在吃飯時飄到學院長桌旁，其餘時間在塔裡與走廊遊蕩；皮皮鬼每 45 分鐘換個地方搗蛋，愛哭鬼麥朵待在她的廁所。
+- 家庭小精靈白天在廚房，宵禁後到各學院交誼廳打掃。
+- 動物：早上 7:10 起貓頭鷹（含嘿美）在大廳上空送信，其餘時間停在貓頭鷹屋；拿樂絲太太跟著飛七、牙牙跟著海格、歪腿與斑斑跟著主人；佛客使在校長室的棲架上；巴嘴拴在海格的小屋旁；夜騏在禁忌森林邊緣；人馬翡冷翠白天在第十一號教室。走到人旁邊按 E 可以對話，對白會依時段、地點與你的學院改變。按 P（或上方的「人物」）可以看每位具名角色此刻在哪裡、在做什麼，點一下就前往。
+
+效能：只有玩家所在的場景或附近戶外的人才會建立模型；動畫依距離降頻更新（12 公尺內每幀、30 公尺內每 3 幀、更遠每 6 幀，路人再慢一倍），只有 25 公尺內的具名角色投影，教室坐滿後多的路人不出現。
+
+座位、床、黑板前與大釜前的位置是在擺家具時自動登記的（`castle/scenes/kit.ts` 的 `chair`、`sofa`、`bed`、`studentDesk`、`blackboard`），大廳的長凳與教師席是手動錨點。
 
 ## 後續規劃
 

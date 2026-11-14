@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Builder, col, mat4, type MatKey } from '../kit';
 import { GOLD, IRON, FIRE, DARKWOOD, MARBLE, IWARM } from '../interiors';
+import { addSpot, type SpotKind } from './registry';
 
 /**
  * 以某個位置與朝向為原點擺放零件。局部座標：+X 向右、+Z 向前（家具的正面）。
@@ -20,6 +21,12 @@ export class At {
   }
   w(lx: number, lz: number): [number, number] {
     return [this.x + lx * this.c + lz * this.s, this.z - lx * this.s + lz * this.c];
+  }
+  /** 登記 NPC 用的位置（座位、床、黑板前）；face 是相對本地 +Z 的轉角 */
+  spot(kind: SpotKind, lx: number, ly: number, lz: number, face = 0) {
+    const [wx, wz] = this.w(lx, lz);
+    addSpot(kind, wx, this.y + ly, wz, this.ry + face);
+    return this;
   }
   at(lx: number, ly: number, lz: number, ry = 0) {
     const [wx, wz] = this.w(lx, lz);
@@ -139,6 +146,7 @@ export function table(p: At, w: number, d: number, h = 0.76, tint?: THREE.Color)
 
 /** 椅子：正面朝 +Z */
 export function chair(p: At, tint?: THREE.Color) {
+  p.spot('seat', 0, 0.5, 0.02);
   p.box('iwood', 0.44, 0.06, 0.44, 0, 0.44, 0, tint);
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) p.box('iwood', 0.05, 0.44, 0.05, sx * 0.18, 0, sz * 0.18, tint);
   p.box('iwood', 0.44, 0.55, 0.05, 0, 0.5, -0.2, tint);
@@ -146,6 +154,7 @@ export function chair(p: At, tint?: THREE.Color) {
 
 /** 扶手椅 */
 export function armchair(p: At, tint: THREE.Color) {
+  p.spot('seat', 0, 0.5, 0.08);
   p.box('iplain', 0.95, 0.42, 0.9, 0, 0.08, 0, tint);
   p.box('iplain', 0.95, 0.75, 0.24, 0, 0.42, -0.36, tint);
   for (const s of [-1, 1]) p.box('iplain', 0.22, 0.32, 0.9, s * 0.42, 0.42, 0, tint);
@@ -153,6 +162,8 @@ export function armchair(p: At, tint: THREE.Color) {
 }
 
 export function sofa(p: At, w: number, tint: THREE.Color) {
+  const n = Math.max(1, Math.floor((w - 0.4) / 0.7));
+  for (let i = 0; i < n; i++) p.spot('seat', (i - (n - 1) / 2) * ((w - 0.5) / n), 0.5, 0.08);
   p.box('iplain', w, 0.42, 0.95, 0, 0.08, 0, tint);
   p.box('iplain', w, 0.7, 0.24, 0, 0.42, -0.38, tint);
   for (const s of [-1, 1]) p.box('iplain', 0.24, 0.34, 0.95, s * (w / 2 - 0.12), 0.42, 0, tint);
@@ -220,6 +231,7 @@ export function armour(p: At) {
 export function bed(p: At, cover: THREE.Color, posts = false, frame: THREE.Color = DARKWOOD) {
   const key: MatKey = posts ? 'iwood' : 'iplain';
   const ft = posts ? frame : STEEL;
+  p.spot('bed', 0, 0.68, 0.1);
   p.box(key, 1.1, 0.12, 2.1, 0, 0.38, 0, ft);
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) p.box(key, 0.08, posts ? 2.2 : sz < 0 ? 1.1 : 0.7, 0.08, sx * 0.53, 0, sz * 1.03, ft);
   p.box(key, 1.1, 0.5, 0.06, 0, 0.55, -1.03, ft);
@@ -268,6 +280,7 @@ export function deskLamp(p: At) {
 
 /** 學生的雙人課桌與長凳：正面（學生面對的方向）朝 +Z */
 export function studentDesk(p: At, w = 1.5) {
+  for (const s of w >= 1.3 ? [-w / 4, w / 4] : [0]) p.spot('seat', s, 0.5, -0.55);
   p.geo('iwood', new THREE.BoxGeometry(w, 0.06, 0.55), 0, 0.78, 0.1, undefined, 0, 0.12);
   for (const s of [-1, 1]) p.box('iwood', 0.06, 0.75, 0.5, s * (w / 2 - 0.05), 0, 0.1);
   p.box('iwood', w - 0.1, 0.4, 0.04, 0, 0.3, 0.33);
@@ -277,6 +290,8 @@ export function studentDesk(p: At, w = 1.5) {
 
 /** 黑板：貼牆，正面朝 +Z，p 在黑板底邊中心 */
 export function blackboard(p: At, w = 4, h = 1.8) {
+  // 講課的位置：黑板前一步、面向教室（高度由 NPC 系統往下找地板）
+  p.spot('board', Math.min(1.2, w * 0.3), 0, 1.5);
   p.box('iwood', w + 0.24, h + 0.24, 0.06, 0, -0.12, 0.03, DARKWOOD);
   p.box('iplain', w, h, 0.05, 0, 0, 0.06, col(0.03, 0.06, 0.045));
   p.box('iwood', w, 0.05, 0.14, 0, -0.1, 0.12, DARKWOOD);

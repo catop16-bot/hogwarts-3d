@@ -34,11 +34,15 @@ export function greenhouseInterior(b: Builder, gx: number, gz: number, v = 0) {
   const POT = col(0.5, 0.22, 0.12);
   const LEAF = [col(0.08, 0.3, 0.07), col(0.14, 0.36, 0.08), col(0.05, 0.22, 0.1)];
   const rng = b.rng;
+  // 教授站在門口那一端，面向花台
+  new At(b, gx - hw + 2.6, y, gz).spot('board', 0, 0, 0, Math.PI / 2);
   // 兩側的長花台與中央的苗床
   for (const s of [-1, 1]) {
     const p = new At(b, gx + 1, y, gz + s * 3.6);
     p.box('iwood', 30, 0.08, 1.2, 0, 0.82, 0);
     for (let i = 0; i < 9; i++) for (const k of [-1, 1]) p.box('iwood', 0.1, 0.82, 0.1, -14.5 + i * 3.6, 0, k * 0.5);
+    // 學生站在走道上、面向花台
+    for (let i = 0; i < 9; i++) p.spot('work', -12.6 + i * 3.1, 0, -s * 1.2, s > 0 ? 0 : Math.PI);
     for (let i = 0; i < 26; i++) {
       const x = -14.2 + i * 1.12;
       const q = p.at(x, 0.9, (rng() - 0.5) * 0.4);
@@ -248,6 +252,7 @@ export function buildClassroomPockets() {
       table(t, 2.2, 0.9, 0.85);
       for (const lx of [-0.6, 0.6]) {
         cauldron(t.at(lx, 0, 1.0), 1, POTION[pi++ % 4]);
+        t.spot('work', lx, 0, 1.75, Math.PI);
         t.box('iplain', 0.3, 0.04, 0.4, lx, 0.85, 0, [RED, col(0.05, 0.16, 0.08)][pi % 2], 0.2);
         t.cyl('iplain', 0.05, 0.07, 0.08, lx + 0.3, 0.85, 0.2, 6, STEEL);
       }

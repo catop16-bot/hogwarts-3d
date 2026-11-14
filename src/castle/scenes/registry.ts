@@ -82,3 +82,29 @@ export function link(a: DoorEnd, b: DoorEnd) {
 export function pocketOrigin(k: number): [number, number, number] {
   return [5000 + (k % 8) * 400, 3000, 5000 + Math.floor(k / 8) * 400];
 }
+
+// ------------------------------------------------------------------ NPC 用的位置
+/** 家具擺放時自動登記的位置：座位、床、黑板前（講課的位置）、站著做事的位置（大釜前、花台前） */
+export type SpotKind = 'seat' | 'bed' | 'board' | 'work' | 'perch';
+export interface Spot {
+  kind: SpotKind;
+  pos: [number, number, number];
+  /** 面向（0 = +Z，與門的 face 相同） */
+  face: number;
+}
+export const SPOTS: Spot[] = [];
+export function addSpot(kind: SpotKind, x: number, y: number, z: number, face: number) {
+  SPOTS.push({ kind, pos: [x, y, z], face });
+}
+
+/** 手動指定的錨點（家具函式涵蓋不到的地方，例如大廳的長凳與教職員席） */
+export interface Anchor {
+  pos: [number, number, number];
+  face: number;
+  /** 預設姿勢：seat 坐、bed 躺、其餘站著 */
+  kind?: SpotKind;
+}
+export const ANCHORS = new Map<string, Anchor>();
+export function anchor(id: string, x: number, y: number, z: number, face: number, kind?: SpotKind) {
+  ANCHORS.set(id, { pos: [x, y, z], face, kind });
+}

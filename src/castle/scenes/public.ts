@@ -353,9 +353,8 @@ export function buildPublicPockets() {
       const p = new At(b, ox - 4.2, oy, oz + 0.5);
       p.cyl('iplain', 0.03, 0.2, 1.6, 0, 0, 0, 8, GOLD);
       p.box('iplain', 0.7, 0.04, 0.04, 0, 1.6, 0, GOLD);
-      p.sphere('iglow', 0.16, 0, 1.82, 0, col(2.6, 0.5, 0.15), 1.3);
-      p.sphere('iglow', 0.09, 0, 2.06, 0.08, col(2.8, 0.7, 0.15));
-      p.geo('iglow', new THREE.ConeGeometry(0.07, 0.6, 6), 0, 1.6, -0.22, col(3, 1.6, 0.3), 0, -2.3);
+      // 佛客使本身是 NPC，停在這根橫桿上
+      p.spot('perch', 0, 1.62, 0, Math.PI / 2);
     }
     // 細腳桌上的銀器
     for (const [dx, dz] of [[3.4, 4.2], [-3.2, 4.6], [-5.6, -1.6]]) {

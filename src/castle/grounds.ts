@@ -6,6 +6,7 @@ import { patchMaterial, makeRng } from '../core/globals';
 import type { Built } from './castle';
 import { honeydukesDoor, towerDoor, doorDecal, WILLOW_DOOR, SHACK_DOOR, PITCH_DOORS } from './scenes/doors';
 import { hagridHut, owleryInterior, stationInterior } from './scenes/campus';
+import { anchor } from './scenes/registry';
 
 const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 const IRON = col(0.04, 0.04, 0.045);
@@ -284,7 +285,14 @@ export function buildGrounds(): { built: Built[]; extras: THREE.Object3D[]; hand
       roofG.scale(9.4, 5.5, 9.4);
       b.add('cloth', roofG, mat4(x, gy + h + 4.2 + 2.75, z, face), c);
       b.cyl('matte', 0.05, 0.08, 4, x, gy + h + 9.6, z, 5, IRON);
-      b.add('cloth', new THREE.PlaneGeometry(2.6, 1.5), mat4(x + 1.3, gy + h + 12.6, z, 0), c);      towerSpots.push({ x, z, gy, face });
+      b.add('cloth', new THREE.PlaneGeometry(2.6, 1.5), mat4(x + 1.3, gy + h + 12.6, z, 0), c);
+      towerSpots.push({ x, z, gy, face });
+      // 看台上觀眾的位置：前排四個、後排兩個，面向球場（塔的顏色依序是葛來分多、史萊哲林、雷文克勞、赫夫帕夫）
+      const cs = Math.cos(face);
+      const sn = Math.sin(face);
+      [[-2.4, 2.7], [-0.8, 2.7], [0.8, 2.7], [2.4, 2.7], [-1.4, 0.9], [1.4, 0.9]].forEach(([lx, lz], j) =>
+        anchor(`pitch.tower.${i}.${j}`, x + lx * cs + lz * sn, gy + h + 0.4, z - lx * sn + lz * cs, face),
+      );
     }
     // 塔與塔之間的低看台；最靠近小徑終點的那一段留作球場入口
     const trail = getPath('pitch');

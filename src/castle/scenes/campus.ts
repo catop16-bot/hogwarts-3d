@@ -242,7 +242,10 @@ export function owleryInterior(b: Builder, ox: number, oy: number, oz: number, r
       const a = (k / 14) * Math.PI * 2 + lv * 0.5;
       const p = new At(b, ox + Math.sin(a) * (rIn - 0.35), yy, oz + Math.cos(a) * (rIn - 0.35), a + Math.PI);
       p.box('iplain', 0.08, 0.08, 0.7, 0, 0, 0, DARKWOOD);
-      if (rng() < 0.45) {
+      const taken = rng() < 0.45;
+      // 下面幾層空著的棲木留給 NPC 貓頭鷹（嘿美）
+      if (!taken && lv < 3) p.spot('perch', 0, 0.08, 0.15);
+      if (taken) {
         const c = OWL[Math.floor(rng() * OWL.length)];
         const s = 0.8 + rng() * 0.5;
         p.sphere('iplain', 0.15 * s, 0, 0.2 * s, 0.05, c, 1.35, 7);

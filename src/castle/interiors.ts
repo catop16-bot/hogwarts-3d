@@ -4,7 +4,7 @@ import { Builder, col, mat4 } from './kit';
 import { PL } from '../world/heightfield';
 import { U, makeRng } from '../core/globals';
 import { getMaterials } from './materials';
-import { registerScene, box3, type DoorEnd } from './scenes/registry';
+import { registerScene, box3, anchor, type DoorEnd } from './scenes/registry';
 import { DOORS, doorDecal } from './scenes/doors';
 import { createCeilingSkyMaterial } from '../environment/sky';
 
@@ -161,10 +161,12 @@ export function greatHallInterior(b: Builder) {
     const z = zc - 7 + i * 1.4;
     const head = i === 5;
     const tint = head ? GOLD : DARKWOOD;
+    anchor(`greatHall.staff.${i}`, -136.62, dy + 0.5, z, Math.PI / 2, 'seat');
     b.box(head ? 'iplain' : 'iwood', 0.6, 0.5, head ? 0.9 : 0.6, -136.7, dy, z, 0, tint);
     b.box(head ? 'iplain' : 'iwood', 0.12, head ? 2.3 : 1.5, head ? 0.9 : 0.6, -137.05, dy, z, 0, tint);
   }
-  // 貓頭鷹講台
+  // 貓頭鷹講台（校長致詞的位置）
+  anchor('greatHall.lectern', -131.1, F, zc, Math.PI / 2);
   b.cyl('iplain', 0.12, 0.3, 1.25, -130, F, zc, 8, GOLD);
   b.sphere('iplain', 0.24, -130, F + 1.5, zc, GOLD, 1.25, 8);
   for (const s of [-1, 1]) b.add('iplain', new THREE.BoxGeometry(0.06, 0.75, 0.5), mat4(-130.05, F + 1.45, zc + s * 0.42, 0, s * 0.5, 0), GOLD);
@@ -182,6 +184,8 @@ export function greatHallInterior(b: Builder) {
     }
     for (let i = 0; i < 27; i++) {
       const x = cx - len / 2 + 1 + i * 1.35;
+      // 長凳上的座位：k 是學院（與 HOUSE_TINTS 順序相同），偶數號在南側、奇數號在北側
+      for (const s of [-1, 1]) anchor(`greatHall.t${k}.${i * 2 + (s > 0 ? 1 : 0)}`, x, F + 0.48, z + s * 0.95, s < 0 ? 0 : Math.PI, 'seat');
       for (const s of [-1, 1]) b.cyl('iplain', 0.15, 0.13, 0.025, x, F + 0.84, z + s * 0.3, 8, GOLD);
       // 每個座位一只高腳金杯
       for (const s of [-1, 1]) {

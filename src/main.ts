@@ -30,6 +30,7 @@ import { SCENES, PORTALS } from './castle/scenes/registry';
 import { CollisionWorld } from './player/collision';
 import { preloadCharacter } from './player/character';
 import { Player } from './player/player';
+import { NpcManager } from './npc/manager';
 
 const canvas = document.getElementById('scene') as HTMLCanvasElement;
 const loadingFill = document.getElementById('loading-fill')!;
@@ -133,6 +134,8 @@ async function boot() {
   await characterReady;
   const player = new Player(camera, canvas, world, rig);
   scene.add(player.character.root);
+  const npcs = new NpcManager(scenes, world, env.time);
+  scene.add(npcs.group);
 
   let fps = 60;
   function applyQuality() {
@@ -163,6 +166,7 @@ async function boot() {
     landmarks,
     player,
     scenes,
+    npcs,
     getQuality: () => qualityName,
     setQuality: (q) => {
       qualityName = q;
@@ -190,7 +194,7 @@ async function boot() {
   let wasWalking = false;
   let fpsAcc = 0;
   let fpsN = 0;
-  (window as any).__hog = { scene, camera, rig, env, player, world, scenes, SCENES, PORTALS, renderer, water, post, landmarks, events, hud, get fps() { return fps; }, get frames() { return frameNo; }, info: renderer.info };
+  (window as any).__hog = { scene, camera, rig, env, player, world, scenes, npcs, SCENES, PORTALS, renderer, water, post, landmarks, events, hud, get fps() { return fps; }, get frames() { return frameNo; }, info: renderer.info };
 
   function frame() {
     timer.update();
@@ -210,6 +214,7 @@ async function boot() {
     // 室內場景：燈光、口袋場景的顯示、室內判定
     interiors.update(U.uTime.value);
     scenes.update(dt, U.uTime.value, camera.position, walking ? player.pos : null, env);
+    npcs.update(dt, camera.position, walking ? player.pos : null);
     player.noFly = !!scenes.active?.pocket;
     player.indoor = !!scenes.active && !scenes.active.outdoor;
     grass.update(camera.position);
